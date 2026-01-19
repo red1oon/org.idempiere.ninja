@@ -1,0 +1,22 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: iDempiere Ninja Plugin Generator
+Bundle-SymbolicName: org.idempiere.ninja;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: org.adempiere.plugin.utils.AdempiereActivator
+Bundle-Vendor: iDempiere Community
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Require-Bundle: org.adempiere.base,
+ org.adempiere.plugin.utils,
+ org.eclipse.equinox.app,
+ org.adempiere.pipo
+Import-Package: org.apache.poi.hssf.usermodel,
+ org.apache.poi.ss.usermodel,
+ org.apache.poi.xssf.usermodel
+Export-Package: org.idempiere.ninja.core,
+ org.idempiere.ninja.generator
+Bundle-ActivationPolicy: lazy
+Automatic-Module-Name: org.idempiere.ninja
+Bundle-ClassPath: .,
+ lib/poi.jar,
+ lib/commons-math3.jar

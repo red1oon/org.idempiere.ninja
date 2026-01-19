@@ -1,0 +1,950 @@
+================================================================================
+VERSIONMASTER - EXCEL TEMPLATE FOR NINJA
+Central Version Control & Information Hub for iDempiere
+================================================================================
+
+================================================================================
+SHEET: Config
+================================================================================
+| Property       | Value                         |
+|----------------|-------------------------------|
+| Bundle-Name    | org.idempiere.versionmaster   |
+| Bundle-Version | 1.0.0                         |
+| Package-Prefix | org.idempiere.versionmaster   |
+| Entity-Type    | U                             |
+
+================================================================================
+SHEET: List
+================================================================================
+| UpdateStatus | UpdateType | LogLevel | BackupType | BackupStatus | PluginStatus | PackageStatus | IssueSeverity | IssueStatus   | SourceType | DatasetStatus |
+|--------------|------------|----------|------------|--------------|--------------|---------------|---------------|---------------|------------|---------------|
+| Pending      | Minor      | Info     | Full       | Active       | Installed    | Applied       | Blocker       | Open          | Wiki       | Loaded        |
+| Checking     | Major      | Warning  | Database   | Archived     | Disabled     | Pending       | Critical      | InProgress    | Forum      | Partial       |
+| Downloading  | Patch      | Error    | Files      | Deleted      | NotInstalled | Failed        | Major         | Resolved      | JIRA       | Cleaned       |
+| Installing   | Security   | Debug    | Config     | Restoring    | UpdateAvail  | Reverted      | Minor         | Closed        | Video      | Error         |
+| Completed    | Hotfix     |          | Custom     | Failed       | Incompatible | Partial       | Trivial       | Wontfix       | GitHub     |               |
+| Failed       |            |          |            |              |              |               |               |               | Manual     |               |
+| RolledBack   |            |          |            |              |               |               |               |               |            |               |
+
+================================================================================
+SHEET: Model
+================================================================================
+| VersionMaster  |                |                |                |                 |                 |                 |                 |                 |
+|                | UpdateHistory  | UpdateHistory  | PluginVersion  | PackageVersion  | Backup          | KnownIssue      | HelpIndex       | Dataset         | Dataset         |
+|                | L#UpdateStatus | UpdateLog      | PluginName     | PackageName     | L#BackupType    | IssueKey        | AD_Table_ID     | DatasetName     | DatasetRecord   |
+|                | L#UpdateType   | d#LogTime      | SymbolicName   | AD_Package_ID   | L#BackupStatus  | L#IssueSeverity | AD_Window_ID    | T#Description   | AD_Table_ID     |
+|                | VersionFrom    | T#LogMessage   | Version        | Version         | BackupName      | L#IssueStatus   | AD_Process_ID   | ExcelPath       | Record_ID       |
+|                | VersionTo      | L#LogLevel     | L#PluginStatus | L#PackageStatus | BackupPath      | Summary         | AD_Field_ID     | TargetClient_ID | TableName       |
+|                | D#StartDate    | Q#LineNo       | Description    | D#AppliedDate   | A#SizeBytes     | T#Description   | L#SourceType    | L#DatasetStatus | Q#SeqNo         |
+|                | D#EndDate      |                | T#Dependencies | T#Description   | D#BackupDate    | AffectsVersion  | Title           | D#LoadedDate    |                 |
+|                | T#ReleaseNotes |                | InstallDate    | T#AppliedBy     | T#Description   | FixedVersion    | URL             | D#CleanedDate   |                 |
+|                | T#ErrorMessage |                | UpdateDate     | Y#CanRevert     | Y#IsScheduled   | JiraURL         | T#Snippet       | Q#RecordCount   |                 |
+|                | Y#IsSuccess    |                | Y#IsCore       | RevertScript    | ScheduleTime    | ForumURL        | Q#ReplyCount    | Q#TableCount    |                 |
+|                | Y#HasBackup    |                | Y#HasUpdate    | T#ChangeLog     | RetentionDays   | WorkaroundURL   | D#LastUpdated   | T#ErrorLog      |                 |
+|                | BackupPath     |                | AvailVersion   |                 | Y#IsCompressed  | T#Workaround    | Q#Relevance     |                 |                 |
+|                | DownloadURL    |                | SourceURL      |                 |                 | Y#HasWorkaround | Y#IsActive      |                 |                 |
+|                | A#DownloadSize |                | GitCommit      |                 |                 |                 |                 |                 |                 |
+|                | ReleaseURL     |                | GitBranch      |                 |                 |                 |                 |                 |                 |
+|                | ForumURL       |                | WikiURL        |                 |                 |                 |                 |                 |                 |
+|                | MigrationURL   |                | ForumURL       |                 |                 |                 |                 |                 |                 |
+|                |                |                | IssueTrackerURL|                 |                 |                 |                 |                 |                 |
+|                |                |                | DownloadURL    |                 |                 |                 |                 |                 |                 |
+
+================================================================================
+SHEET: Process
+================================================================================
+| ProcessName       | Class                                                     | Table              | Parameters                                    |
+|-------------------|-----------------------------------------------------------|--------------------|-----------------------------------------------|
+| CheckUpdate       | org.idempiere.versionmaster.process.CheckUpdateProcess    | VM_UpdateHistory   | ForceCheck:YesNo                              |
+| RunUpdate         | org.idempiere.versionmaster.process.RunUpdateProcess      | VM_UpdateHistory   | SkipDownload:YesNo, SkipBackup:YesNo          |
+| RollbackUpdate    | org.idempiere.versionmaster.process.RollbackProcess       | VM_UpdateHistory   |                                               |
+| FetchReleaseInfo  | org.idempiere.versionmaster.process.FetchReleaseInfoProcess| VM_UpdateHistory  |                                               |
+| ScanPlugins       | org.idempiere.versionmaster.process.ScanPluginsProcess    | VM_PluginVersion   | IncludeCore:YesNo                             |
+| FetchPluginInfo   | org.idempiere.versionmaster.process.FetchPluginInfoProcess| VM_PluginVersion   |                                               |
+| EnablePlugin      | org.idempiere.versionmaster.process.EnablePluginProcess   | VM_PluginVersion   |                                               |
+| DisablePlugin     | org.idempiere.versionmaster.process.DisablePluginProcess  | VM_PluginVersion   |                                               |
+| ScanPackages      | org.idempiere.versionmaster.process.ScanPackagesProcess   | VM_PackageVersion  |                                               |
+| RevertPackage     | org.idempiere.versionmaster.process.RevertPackageProcess  | VM_PackageVersion  | CreateBackup:YesNo                            |
+| SyncKnownIssues   | org.idempiere.versionmaster.process.SyncKnownIssuesProcess| VM_KnownIssue      |                                               |
+| CreateBackup      | org.idempiere.versionmaster.process.CreateBackupProcess   | VM_Backup          | BackupType:L#BackupType, Description:String   |
+| RestoreBackup     | org.idempiere.versionmaster.process.RestoreBackupProcess  | VM_Backup          | StopServer:YesNo                              |
+| DeleteBackup      | org.idempiere.versionmaster.process.DeleteBackupProcess   | VM_Backup          |                                               |
+| PurgeOldBackups   | org.idempiere.versionmaster.process.PurgeBackupsProcess   |                    | OlderThanDays:Integer                         |
+| UpdateHelpIndex   | org.idempiere.versionmaster.process.UpdateHelpIndexProcess| VM_HelpIndex       | SourceType:L#SourceType, ForceRefresh:YesNo   |
+| CleanHelpIndex    | org.idempiere.versionmaster.process.CleanHelpIndexProcess | VM_HelpIndex       | OlderThanDays:Integer, SourceType:L#SourceType|
+| ResetHelpIndex    | org.idempiere.versionmaster.process.ResetHelpIndexProcess |                    | ConfirmReset:YesNo                            |
+| InjectDataset     | org.idempiere.versionmaster.process.InjectDatasetProcess  | VM_Dataset         | ExcelFile:String, AD_Client_ID:TableDir, ValidateOnly:YesNo |
+| CleanDataset      | org.idempiere.versionmaster.process.CleanDatasetProcess   | VM_Dataset         | ConfirmClean:YesNo                            |
+| ExportToExcel     | org.idempiere.versionmaster.process.ExportToExcelProcess  | VM_Dataset         | IncludeSystemCols:YesNo                       |
+| SQLToExcel        | org.idempiere.versionmaster.process.SQLToExcelProcess     |                    | SQLFile:String, OutputPath:String             |
+
+================================================================================
+SHEET: Menu
+================================================================================
+| MenuName            | Type    | Action   | Window/Process   | Parent            |
+|---------------------|---------|----------|------------------|-------------------|
+| Version Master      | Summary |          |                  |                   |
+| Update History      | Window  | W        | UpdateHistory    | Version Master    |
+| Plugin Versions     | Window  | W        | PluginVersion    | Version Master    |
+| Package Versions    | Window  | W        | PackageVersion   | Version Master    |
+| Known Issues        | Window  | W        | KnownIssue       | Version Master    |
+| Backup Manager      | Window  | W        | Backup           | Version Master    |
+| Sample Datasets     | Window  | W        | Dataset          | Version Master    |
+| Check Updates       | Process | P        | CheckUpdate      | Version Master    |
+| Scan Plugins        | Process | P        | ScanPlugins      | Version Master    |
+| Sync Known Issues   | Process | P        | SyncKnownIssues  | Version Master    |
+| Create Backup       | Process | P        | CreateBackup     | Version Master    |
+| Inject Dataset      | Process | P        | InjectDataset    | Version Master    |
+| SQL to Excel        | Process | P        | SQLToExcel       | Version Master    |
+
+================================================================================
+GENERATED WINDOW LAYOUTS
+================================================================================
+
+--------------------------------------------------------------------------------
+Update History Window - With External Links
+--------------------------------------------------------------------------------
++-------------------------------------------------------------------------+
+|  Update History                                           [Gear Menu v]  |
+|  +---------------------------------------------------------------------+ |
+|  | [Check Updates]  [Run Update]  [Rollback]  [Fetch Release Info]     | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  Tab: Update History                                                     |
+|  +---------------------------------------------------------------------+ |
+|  | Status: [Completed v]    Type: [Major v]                            | |
+|  | Version From: [11.0.0]   Version To: [12.0.0]                       | |
+|  | Start Date: [2024-01-15] End Date: [2024-01-15]                     | |
+|  | Success: [Y]             Has Backup: [Y]                            | |
+|  +---------------------------------------------------------------------+ |
+|  |                                                                     | |
+|  | EXTERNAL LINKS (clickable):                                         | |
+|  | +-------------------------------+-------------------------------+  | |
+|  | | Release Notes:                | Migration Guide:              |  | |
+|  | | [View on GitHub]              | [View Wiki]                   |  | |
+|  | | github.com/idempiere/...      | wiki.idempiere.org/...        |  | |
+|  | +-------------------------------+-------------------------------+  | |
+|  | | Forum Discussion:             | Download:                     |  | |
+|  | | [View Thread]                 | [Direct Link]                 |  | |
+|  | | forum.idempiere.org/...       | sourceforge.net/...           |  | |
+|  | +-------------------------------+-------------------------------+  | |
+|  |                                                                     | |
+|  | Release Notes:                                                      | |
+|  | +---------------------------------------------------------------+  | |
+|  | | iDempiere 12.0.0 Release                                      |  | |
+|  | | =============================                                  |  | |
+|  | | New Features:                                                  |  | |
+|  | | - Feature A: Description...                                    |  | |
+|  | | - Feature B: Description...                                    |  | |
+|  | |                                                                |  | |
+|  | | Bug Fixes:                                                     |  | |
+|  | | - IDEMPIERE-1234: Fixed issue with...                         |  | |
+|  | | - IDEMPIERE-1235: Resolved problem...                         |  | |
+|  | |                                                                |  | |
+|  | | Breaking Changes:                                              |  | |
+|  | | - API change in MOrder.completeIt()                           |  | |
+|  | +---------------------------------------------------------------+  | |
+|  +---------------------------------------------------------------------+ |
++-------------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+Plugin Versions Window - With Info Links
+--------------------------------------------------------------------------------
++-------------------------------------------------------------------------+
+|  Plugin Versions                                          [Gear Menu v]  |
+|  +---------------------------------------------------------------------+ |
+|  | [Scan Plugins]  [Fetch Info]  [Enable]  [Disable]                   | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  +---------------------------------------------------------------------+ |
+|  | Plugin Name    | Version | Status     | Update? | Source            | |
+|  | ---------------+---------+------------+---------+------------------ | |
+|  | iDempiere Base | 12.0.0  | Installed  | -       | github.com/...    | |
+|  | VersionMaster  | 1.0.0   | Installed  | -       | github.com/...    | |
+|  | My Custom      | 2.1.0   | UpdateAvail| 2.2.0   | github.com/...    | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  PLUGIN DETAILS:                                                         |
+|  +---------------------------------------------------------------------+ |
+|  | Symbolic Name: [com.mycompany.custom]                               | |
+|  | Current Version: [2.1.0]    Available: [2.2.0]                      | |
+|  | Git Commit: [a1b2c3d]       Branch: [main]                          | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  QUICK LINKS:                                                            |
+|  +------------------+------------------+------------------+              |
+|  | [Source Code]    | [Documentation]  | [Issue Tracker]  |              |
+|  | GitHub Repo      | Wiki Page        | GitHub Issues    |              |
+|  +------------------+------------------+------------------+              |
+|  | [Forum Thread]   | [Download]       | [Changelog]      |              |
+|  | Community Help   | Latest Release   | What's New       |              |
+|  +------------------+------------------+------------------+              |
+|                                                                          |
+|  Dependencies:                                                           |
+|  +---------------------------------------------------------------+     |
+|  | org.adempiere.base >= 11.0.0                                  |     |
+|  | org.adempiere.ui.zk >= 11.0.0                                 |     |
+|  +---------------------------------------------------------------+     |
++-------------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+Known Issues Window - Synced from JIRA/GitHub
+--------------------------------------------------------------------------------
++-------------------------------------------------------------------------+
+|  Known Issues                                             [Gear Menu v]  |
+|  +---------------------------------------------------------------------+ |
+|  | [Sync Known Issues]  [Filter: Current Version v]                    | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  +---------------------------------------------------------------------+ |
+|  | Key           | Severity | Status   | Affects    | Summary          | |
+|  | --------------+----------+----------+------------+----------------- | |
+|  | IDEMPIERE-5678| Critical | Open     | 12.0.0     | Login fails w... | |
+|  | IDEMPIERE-5679| Major    | InProgress| 12.0.0    | Report export... | |
+|  | IDEMPIERE-5680| Minor    | Resolved | 12.0.0     | UI alignment...  | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  ISSUE DETAILS:                                                          |
+|  +---------------------------------------------------------------------+ |
+|  | IDEMPIERE-5678: Login fails when using SSO                          | |
+|  | Severity: [Critical]    Status: [Open]                              | |
+|  | Affects: [12.0.0]       Fixed In: [ - ]                             | |
+|  +---------------------------------------------------------------------+ |
+|  | Description:                                                        | |
+|  | +---------------------------------------------------------------+  | |
+|  | | When SSO is enabled and user attempts to login via SAML,      |  | |
+|  | | the system throws NullPointerException in MSession.           |  | |
+|  | +---------------------------------------------------------------+  | |
+|  |                                                                     | |
+|  | LINKS:                                                              | |
+|  | +-------------------+-------------------+-------------------+       | |
+|  | | [View in JIRA]    | [Forum Discussion]| [Workaround]      |       | |
+|  | | Full details      | Community thread  | Temp fix          |       | |
+|  | +-------------------+-------------------+-------------------+       | |
+|  |                                                                     | |
+|  | Has Workaround: [Y]                                                 | |
+|  | Workaround:                                                         | |
+|  | +---------------------------------------------------------------+  | |
+|  | | Disable SSO temporarily by setting:                           |  | |
+|  | | AD_SysConfig: USE_SSO = N                                     |  | |
+|  | | Restart server after change.                                   |  | |
+|  | +---------------------------------------------------------------+  | |
+|  +---------------------------------------------------------------------+ |
++-------------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+Package Versions Window - 2Pack History with Links
+--------------------------------------------------------------------------------
++-------------------------------------------------------------------------+
+|  Package Versions                                         [Gear Menu v]  |
+|  +---------------------------------------------------------------------+ |
+|  | [Scan Packages]  [Revert Package]                                   | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  +---------------------------------------------------------------------+ |
+|  | Package Name        | Version | Status  | Applied      | Revert?   | |
+|  | --------------------+---------+---------+--------------+---------- | |
+|  | My Custom Module    | 2.1.0   | Applied | 2024-01-15   | Yes       | |
+|  | HR Extensions       | 1.5.0   | Applied | 2024-01-05   | Yes       | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  Change Log:                                                             |
+|  +---------------------------------------------------------------+     |
+|  | v2.1.0 - 2024-01-15                                           |     |
+|  | - Added new attendance report                                  |     |
+|  | - Fixed leave calculation bug (MYISSUE-123)                    |     |
+|  |                                                                |     |
+|  | v2.0.0 - 2024-01-10                                           |     |
+|  | - Major refactor of HR module                                  |     |
+|  | - New employee onboarding workflow                             |     |
+|  +---------------------------------------------------------------+     |
++-------------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+Sample Datasets Window - Data Sandbox Manager
+--------------------------------------------------------------------------------
++-------------------------------------------------------------------------+
+|  Sample Datasets                                          [Gear Menu v]  |
+|  +---------------------------------------------------------------------+ |
+|  | [Inject Dataset]  [Clean Dataset]  [Export to Excel]  [SQL to Excel]| |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  +---------------------------------------------------------------------+ |
+|  | Dataset Name          | Status  | Records | Tables | Loaded         | |
+|  | ----------------------+---------+---------+--------+--------------- | |
+|  | AssetMaintenance Demo | Loaded  | 54      | 7      | 2026-01-19     | |
+|  | GardenWorld Extended  | Loaded  | 120     | 12     | 2026-01-15     | |
+|  | HR Training Data      | Cleaned | 0       | 0      | 2026-01-10     | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  DATASET DETAILS:                                                        |
+|  +---------------------------------------------------------------------+ |
+|  | Name: [AssetMaintenance Demo]                                       | |
+|  | Excel Path: [/home/user/data/AssetMaint_SampleData.xls]             | |
+|  | Status: [Loaded]                                                    | |
+|  | Loaded: [2026-01-19 10:30]   Cleaned: [ - ]                         | |
+|  | Records: [54]                Tables: [7]                            | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
+|  Tab: Dataset Records (child) - Tracks every injected record            |
+|  +---------------------------------------------------------------------+ |
+|  | SeqNo | Table Name           | Record ID  | Status                  | |
+|  | ------+----------------------+------------+------------------------ | |
+|  | 1     | MP_Meter             | 1000001    | Active                  | |
+|  | 2     | MP_Meter             | 1000002    | Active                  | |
+|  | 3     | A_Asset              | 1000001    | Active                  | |
+|  | 4     | A_Asset              | 1000002    | Active                  | |
+|  | ...   | ...                  | ...        | ...                     | |
+|  +---------------------------------------------------------------------+ |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+================================================================================
+DATASET SANDBOX - DATA INJECTION & CLEANUP
+================================================================================
+
+Purpose: Load sample/test data from Excel, track all created records,
+         and cleanly remove them when done. Perfect for:
+         - Demo environments
+         - Training setups
+         - Development testing
+         - Data migration testing
+
+EXCEL FORMAT FOR DATA INJECTION:
+--------------------------------
+Each sheet = One table (sheet name = table name)
+Row 1 = Column headers (field names)
+Row 2+ = Data rows
+
+Example: AssetMaintenance_SampleData.xls
+
+Sheet: MP_Meter
++--------+----------+
+| Name   | MaxDay   |
++--------+----------+
+| Kilometers      | 30 |
+| Operating Hours | 7  |
++--------+----------+
+
+Sheet: A_Asset
++--------+-------------------+---------------------+
+| Value  | Name              | Description         |
++--------+-------------------+---------------------+
+| VH-001 | Delivery Truck #1 | Ford F-150          |
+| VH-002 | Forklift #1       | Toyota Forklift     |
++--------+-------------------+---------------------+
+
+Sheet: MP_AssetMeter
++----------+------------------+---------+---------------+
+| Value    | Name             | Amt     | A_Asset_ID    |
++----------+------------------+---------+---------------+
+| VH001-KM | Truck #1 Odometer| 45000   | @A_Asset.VH-001 |
+| VH002-HRS| Forklift Hours   | 1200    | @A_Asset.VH-002 |
++----------+------------------+---------+---------------+
+
+Notes:
+- System columns (AD_Client_ID, AD_Org_ID, etc.) auto-filled by Ninja
+- Foreign keys use @TableName.Value lookup syntax
+- Dates can use @TODAY, @TODAY-30, etc.
+
+MULTI-TENANT AWARENESS:
+-----------------------
+iDempiere is multi-tenant. Data injection must respect client context:
+
+| Run From        | AD_Client_ID Parameter | Result                    |
+|-----------------|------------------------|---------------------------|
+| System (0)      | Not specified          | ERROR - must specify      |
+| System (0)      | GardenWorld (11)       | Data -> Client 11         |
+| GardenWorld (11)| Not specified          | Data -> Client 11 (auto)  |
+| GardenWorld (11)| Different client       | ERROR - no cross-client   |
+
+Best Practice:
+- Run InjectDataset from the TARGET tenant client context
+- OR run from System with explicit AD_Client_ID parameter
+- VM_Dataset record stores which client owns the dataset
+- CleanDataset only works for datasets owned by current client
+
+INJECT PROCESS FLOW:
+--------------------
+1. Read Excel file
+2. Parse sheet order (respects FK dependencies)
+3. For each table/sheet:
+   a. Create records using Ninja engine
+   b. Store each Record_ID in VM_DatasetRecord
+   c. Track TableName + Record_ID + SeqNo
+4. Update VM_Dataset with counts and status
+
+CLEAN PROCESS FLOW:
+-------------------
+1. Read VM_DatasetRecord in REVERSE SeqNo order
+   (children before parents to respect FK constraints)
+2. For each record:
+   a. DELETE FROM {TableName} WHERE {TableName}_ID = {Record_ID}
+   b. Mark record as cleaned
+3. Update VM_Dataset status = 'Cleaned'
+
+HANDLING CASCADE CONSTRAINTS:
+-----------------------------
+Problem: User data may reference sample data after injection
+
+Solution 1: Soft delete (set IsActive='N')
+Solution 2: Reassign references (prompt user)
+Solution 3: Abort with list of blocking records
+
+Example cascade check:
+```
+-- Before deleting A_Asset 1000001, check:
+SELECT COUNT(*) FROM C_OrderLine WHERE M_Product_ID IN
+  (SELECT M_Product_ID FROM A_Asset WHERE A_Asset_ID = 1000001);
+-- If > 0, cannot delete or must reassign
+```
+
+SQL TO EXCEL CONVERSION:
+------------------------
+Converts SQL INSERT statements to Excel format.
+
+Input: GardenWorld_SampleData.sql
+```sql
+INSERT INTO mp_meter (mp_meter_id, ad_client_id, ad_org_id, ..., name, maxday)
+VALUES (1000001, 11, 11, ..., 'Kilometers', 30),
+       (1000002, 11, 11, ..., 'Operating Hours', 7);
+```
+
+Output: GardenWorld_SampleData.xls
+
+Sheet: MP_Meter
++------------+--------+
+| Name       | MaxDay |
++------------+--------+
+| Kilometers | 30     |
+| Operating Hours | 7 |
++------------+--------+
+
+Process:
+1. Parse SQL for INSERT statements
+2. Extract table name, columns, values
+3. Skip system columns (AD_Client_ID, AD_Org_ID, Created, etc.)
+4. Skip UUID columns (*_UU)
+5. Convert NOW() to empty (system fills on import)
+6. Resolve FK IDs to @TableName.Value lookups where possible
+7. Create Excel sheet per table
+
+================================================================================
+INFORMATION SOURCES
+================================================================================
+
+VersionMaster aggregates information from multiple sources:
+
+1. iDEMPIERE CORE:
+   +------------------------------------------------------------------+
+   | Source                  | URL Pattern                            |
+   |-------------------------|----------------------------------------|
+   | GitHub Releases         | github.com/idempiere/idempiere/releases|
+   | JIRA Issues             | jira.idempiere.org/browse/IDEMPIERE-*  |
+   | Wiki Documentation      | wiki.idempiere.org/en/                 |
+   | Forum Discussions       | groups.google.com/g/idempiere          |
+   | Migration Guides        | wiki.idempiere.org/en/Migrating_to_*   |
+   +------------------------------------------------------------------+
+
+2. COMMUNITY PLUGINS:
+   +------------------------------------------------------------------+
+   | Source                  | How to Configure                       |
+   |-------------------------|----------------------------------------|
+   | GitHub Releases API     | Set SourceURL to GitHub repo           |
+   | GitLab Releases API     | Set SourceURL to GitLab repo           |
+   | Custom Update Server    | Set SourceURL to JSON endpoint         |
+   | Maven Central           | For published artifacts                |
+   +------------------------------------------------------------------+
+
+3. PLUGIN INFO ENDPOINTS (JSON format):
+   ```json
+   {
+     "symbolicName": "com.mycompany.plugin",
+     "latestVersion": "2.2.0",
+     "downloadURL": "https://...",
+     "releaseNotes": "...",
+     "documentationURL": "https://wiki...",
+     "forumURL": "https://forum...",
+     "issueTrackerURL": "https://github.com/.../issues",
+     "knownIssues": [
+       {
+         "key": "ISSUE-123",
+         "severity": "Major",
+         "summary": "...",
+         "workaround": "..."
+       }
+     ]
+   }
+   ```
+
+================================================================================
+SYNC PROCESSES
+================================================================================
+
+1. FetchReleaseInfo Process:
+   - Queries GitHub Releases API for iDempiere
+   - Parses release notes markdown
+   - Extracts JIRA issue references
+   - Populates ReleaseNotes, ReleaseURL, MigrationURL
+
+2. FetchPluginInfo Process:
+   - Reads plugin's SourceURL
+   - Fetches plugin info JSON
+   - Updates WikiURL, ForumURL, IssueTrackerURL, DownloadURL
+   - Checks for available updates
+
+3. SyncKnownIssues Process:
+   - Queries JIRA API for issues affecting current versions
+   - Fetches open issues for installed plugins
+   - Populates VM_KnownIssue table
+   - Links to forum workaround discussions
+
+================================================================================
+URL FIELD BEHAVIOR
+================================================================================
+
+URL fields in the UI should:
+1. Display as clickable hyperlinks
+2. Open in external browser when clicked
+3. Show tooltip with full URL on hover
+
+Implementation options:
+- ZK: Use <a> tag in field renderer
+- Standard AD: Use URL reference type (DisplayType 39)
+
+================================================================================
+CONFIGURATION (AD_SysConfig)
+================================================================================
+
+| Key                              | Default Value                        |
+|----------------------------------|--------------------------------------|
+| VM_GITHUB_API_TOKEN              | (optional, for higher rate limits)   |
+| VM_JIRA_API_URL                  | https://jira.idempiere.org           |
+| VM_WIKI_BASE_URL                 | https://wiki.idempiere.org           |
+| VM_FORUM_BASE_URL                | https://groups.google.com/g/idempiere|
+| VM_AUTO_SYNC_INTERVAL_HOURS      | 24                                   |
+| VM_SYNC_KNOWN_ISSUES             | Y                                    |
+| VM_SHOW_RESOLVED_ISSUES          | N                                    |
+
+================================================================================
+USER WORKFLOW EXAMPLE
+================================================================================
+
+Scenario: User sees "Update Available" notification
+
+1. Opens VersionMaster > Update History
+2. Sees new version 12.0.0 available
+3. Clicks [View on GitHub] - reads release notes
+4. Clicks [View Wiki] - reads migration guide
+5. Clicks [Forum Thread] - reads community experiences
+6. Opens Known Issues window - checks for blockers
+7. Sees one Critical issue but has workaround
+8. Decides to proceed with update
+9. Clicks [Run Update]
+10. Update completes
+11. Applies workaround from Known Issues window
+
+All information in ONE place - no context switching!
+
+================================================================================
+CONTEXTUAL HELP ENHANCEMENT
+================================================================================
+
+iDempiere's default Help is generic. VersionMaster enhances it with
+context-aware links based on the current window/table/process.
+
+HOW IT WORKS:
+-------------
+1. User presses F1 or clicks Help icon on any window
+2. VersionMaster intercepts the help request
+3. Identifies current context (Table, Window, Process, Field)
+4. Searches indexed help sources for relevant content
+5. Displays aggregated help with clickable links
+
+HELP POPUP ENHANCED (Rich HTML with Infographics):
++-------------------------------------------------------------------------+
+|  Help: Sales Order Window                                    [X]        |
+|-------------------------------------------------------------------------|
+|  +-------------------------------------------------------------------+  |
+|  |  [ICON: Shopping Cart]                                            |  |
+|  |  SALES ORDER                                                       |  |
+|  |  Create and manage customer orders                                 |  |
+|  |                                                                    |  |
+|  |  [====STATUS BAR====]  3 Known Issues | 12 Wiki Articles | 45 FAQ  |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  +---[TAB: Documentation]--[TAB: Discussions]--[TAB: Issues]--------+  |
+|                                                                          |
+|  QUICK START GUIDE:                                   [Rich HTML Card]  |
+|  +-------------------------------------------------------------------+  |
+|  | +-------------+  +-------------+  +-------------+                 |  |
+|  | |  [ICON]     |  |  [ICON]     |  |  [ICON]     |                 |  |
+|  | |  Step 1     |  |  Step 2     |  |  Step 3     |                 |  |
+|  | | Select BP   |  | Add Lines   |  | Complete    |                 |  |
+|  | +-------------+  +-------------+  +-------------+                 |  |
+|  |        |               |               |                          |  |
+|  |        +--------->-----+--------->-----+                          |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  RELATED DOCUMENTATION:                               [Visual Cards]    |
+|  +-------------------------------------------------------------------+  |
+|  | +---------------------------+  +---------------------------+      |  |
+|  | | [WIKI ICON]               |  | [VIDEO ICON]              |      |  |
+|  | | Sales Order Overview      |  | Video Tutorial            |      |  |
+|  | | Comprehensive guide to... |  | Step-by-step walkthrough  |      |  |
+|  | | [BADGE: Official Doc]     |  | [BADGE: 15 min] [PLAY]    |      |  |
+|  | +---------------------------+  +---------------------------+      |  |
+|  |                                                                   |  |
+|  | +---------------------------+  +---------------------------+      |  |
+|  | | [PDF ICON]                |  | [SLIDES ICON]             |      |  |
+|  | | Order Process Flow        |  | Training Presentation     |      |  |
+|  | | Detailed workflow diagram |  | For new users             |      |  |
+|  | | [BADGE: PDF Download]     |  | [BADGE: 25 slides]        |      |  |
+|  | +---------------------------+  +---------------------------+      |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  FORUM DISCUSSIONS:                                   [Activity Feed]   |
+|  +-------------------------------------------------------------------+  |
+|  | [AVATAR] Sales Order Common Questions                             |  |
+|  |          FAQ Thread - 142 replies - Last: 2 days ago              |  |
+|  |          [BADGES: Popular] [Pinned] [Solved]                      |  |
+|  |          ________________________________________________         |  |
+|  |                                                                   |  |
+|  | [AVATAR] How to customize order workflow?                         |  |
+|  |          Discussion - 23 replies - Last: 1 week ago               |  |
+|  |          [BADGES: Best Answer] [Code Sample]                      |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  KNOWN ISSUES:                                        [Status Cards]    |
+|  +-------------------------------------------------------------------+  |
+|  | [!] IDEMPIERE-5890                              [CRITICAL - RED]  |  |
+|  |     Tax calculation wrong when multi-currency                     |  |
+|  |     [PROGRESS BAR: 75% Fixed] [BADGE: Workaround Available]       |  |
+|  |     +-- Click for workaround --+                                  |  |
+|  |     ________________________________________________              |  |
+|  |                                                                   |  |
+|  | [i] IDEMPIERE-5891                              [MINOR - YELLOW]  |  |
+|  |     Performance slow with 1000+ lines                             |  |
+|  |     [PROGRESS BAR: 30% Fixed] [BADGE: In Progress]                |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  VERSION HISTORY:                                     [Timeline View]   |
+|  +-------------------------------------------------------------------+  |
+|  |  v12.0.0 ----o---- v11.0.0 ----o---- v10.0.0                      |  |
+|  |              |                 |                                   |  |
+|  |         [NEW] Quick Entry  [IMPROVED]                              |  |
+|  |              Mode          Tax Engine                              |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+IMPLEMENTATION:
+---------------
+
+1. NEW TABLE: VM_HelpIndex
+   - Indexes help content from various sources
+   - Maps to AD_Table, AD_Window, AD_Process, AD_Field
+
+| VM_HelpIndex   |
+|----------------|
+| AD_Table_ID    |
+| AD_Window_ID   |
+| AD_Process_ID  |
+| AD_Field_ID    |
+| SourceType     |  (Wiki, Forum, Video, JIRA)
+| Title          |
+| URL            |
+| Snippet        |
+| ReplyCount     |
+| LastUpdated    |
+| Relevance      |
+
+2. NEW PROCESS: IndexHelpSources
+   - Crawls wiki pages, extracts table/window references
+   - Searches forum for discussions mentioning specific windows
+   - Links JIRA issues to affected tables/windows
+   - Indexes video tutorials by topic
+
+3. HELP INTERCEPTOR:
+   - Register as IHelpProvider service
+   - Intercept help requests
+   - Query VM_HelpIndex for context
+   - Render enhanced help popup
+
+CODE EXAMPLE:
+```java
+public class VMHelpProvider implements IHelpProvider {
+
+    @Override
+    public String getHelp(int AD_Window_ID, int AD_Tab_ID, int AD_Field_ID) {
+        StringBuilder help = new StringBuilder();
+
+        // Get standard help
+        help.append(getStandardHelp(AD_Window_ID));
+
+        // Get wiki links
+        List<VMHelpIndex> wikiLinks = getHelpIndex(AD_Window_ID, "Wiki");
+        if (!wikiLinks.isEmpty()) {
+            help.append("<h3>Related Documentation</h3>");
+            for (VMHelpIndex link : wikiLinks) {
+                help.append(formatLink(link));
+            }
+        }
+
+        // Get forum discussions
+        List<VMHelpIndex> forumLinks = getHelpIndex(AD_Window_ID, "Forum");
+        if (!forumLinks.isEmpty()) {
+            help.append("<h3>Forum Discussions</h3>");
+            for (VMHelpIndex link : forumLinks) {
+                help.append(formatLink(link));
+            }
+        }
+
+        // Get known issues
+        List<VMKnownIssue> issues = getIssuesForWindow(AD_Window_ID);
+        if (!issues.isEmpty()) {
+            help.append("<h3>Known Issues</h3>");
+            for (VMKnownIssue issue : issues) {
+                help.append(formatIssue(issue));
+            }
+        }
+
+        return help.toString();
+    }
+}
+```
+
+INDEXING STRATEGY:
+------------------
+
+1. WIKI PAGES:
+   - Parse wiki HTML for "(Window)" suffix in titles
+   - Extract table names from "Table: X" patterns
+   - Map to AD_Table/AD_Window by name matching
+
+2. FORUM POSTS:
+   - Search Google Groups API: "site:groups.google.com/g/idempiere {WindowName}"
+   - Store top 5 results per window
+   - Update weekly
+
+3. JIRA ISSUES:
+   - Query JIRA: component = "WindowName" OR text ~ "WindowName"
+   - Link issues to AD_Window/AD_Table
+   - Sync daily for open issues
+
+4. VIDEO TUTORIALS:
+   - Curated list of YouTube channels
+   - Search by window/feature name
+   - Manual curation for quality
+
+CONFIGURATION:
+--------------
+| Key                              | Default Value                        |
+|----------------------------------|--------------------------------------|
+| VM_HELP_WIKI_ENABLED             | Y                                    |
+| VM_HELP_FORUM_ENABLED            | Y                                    |
+| VM_HELP_JIRA_ENABLED             | Y                                    |
+| VM_HELP_VIDEO_ENABLED            | Y                                    |
+| VM_HELP_MAX_FORUM_RESULTS        | 5                                    |
+| VM_HELP_MAX_WIKI_RESULTS         | 5                                    |
+| VM_HELP_CACHE_HOURS              | 24                                   |
+
+================================================================================
+USER EDUCATION - THE #1 PAIN POINT
+================================================================================
+
+Major complaint from iDempiere users and implementers:
+"Where do I learn how to use this? Documentation is scattered everywhere!"
+
+VersionMaster addresses this by becoming the LEARNING HUB:
+
+LEARNING PATH DASHBOARD:
++-------------------------------------------------------------------------+
+|  Welcome to iDempiere Learning Hub          [Powered by VersionMaster]  |
+|-------------------------------------------------------------------------|
+|                                                                          |
+|  YOUR PROGRESS:                                   [GAMIFICATION BADGES]  |
+|  +-------------------------------------------------------------------+  |
+|  |  [============================50%====                    ]        |  |
+|  |  You've explored 23 of 46 core windows                            |  |
+|  |                                                                   |  |
+|  |  BADGES EARNED:                                                   |  |
+|  |  [First Order] [Inventory Pro] [Report Builder] [+ 5 more]        |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  RECOMMENDED FOR YOU:                             [AI-Suggested Topics]  |
+|  +-------------------------------------------------------------------+  |
+|  | Based on your recent activity, learn about:                       |  |
+|  |                                                                   |  |
+|  | +------------------+  +------------------+  +------------------+  |  |
+|  | | [BEGINNER]       |  | [INTERMEDIATE]   |  | [ADVANCED]       |  |  |
+|  | | Purchase Orders  |  | Multi-Warehouse  |  | Custom Workflow  |  |  |
+|  | | 15 min | Video   |  | 30 min | Guide   |  | 45 min | Tutorial |  |  |
+|  | | [START NOW]      |  | [START]          |  | [START]          |  |  |
+|  | +------------------+  +------------------+  +------------------+  |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  LEARNING PATHS:                                                         |
+|  +-------------------------------------------------------------------+  |
+|  |  SALES TRACK        [===========60%=========            ]         |  |
+|  |  [x] Quotes          [x] Orders      [x] Invoicing    [ ] Reports |  |
+|  |                                                                   |  |
+|  |  PURCHASING TRACK    [=====30%=====                     ]         |  |
+|  |  [x] Requisitions    [ ] PO         [ ] Receiving    [ ] Matching |  |
+|  |                                                                   |  |
+|  |  INVENTORY TRACK     [0%                                ]         |  |
+|  |  [ ] Movements       [ ] Counting   [ ] Adjustments   [ ] Reports |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  QUICK TUTORIALS (Most Viewed):                                          |
+|  +-------------------------------------------------------------------+  |
+|  | [PLAY] How to Create Your First Invoice         (1,234 views)     |  |
+|  | [PLAY] Understanding the Document Workflow      (987 views)       |  |
+|  | [PLAY] Setting Up Chart of Accounts             (756 views)       |  |
+|  | [PLAY] Managing Multi-Organization              (654 views)       |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  COMMUNITY Q&A - TOP QUESTIONS THIS WEEK:                                |
+|  +-------------------------------------------------------------------+  |
+|  | [?] How do I set up tax for my country?         [142 answers]     |  |
+|  | [?] What's the difference between Order & Invoice? [89 answers]   |  |
+|  | [?] How to track inventory by location?         [67 answers]      |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+IN-CONTEXT LEARNING (While User Works):
++-------------------------------------------------------------------------+
+|  Sales Order Window                                        [HELP ICON]  |
+|-------------------------------------------------------------------------|
+|  [TIP ICON] First time here? Watch a 2-min intro  [PLAY] [DISMISS]      |
+|-------------------------------------------------------------------------|
+|                                                                          |
+|  Document No: ____________     [?] <- Click for field-specific help     |
+|  Business Partner: ________   [TIP: Type 3 chars to search]             |
+|  Date: ____________                                                      |
+|                                                                          |
+|  Lines:                                                                  |
+|  +-------------------------------------------------------------------+  |
+|  | [HINT: Click + to add items, drag to reorder]                     |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  [STUCK?] Common issues on this screen:                                  |
+|  - Can't find product? Check if it's in price list                       |
+|  - Total not calculating? Verify tax setup                               |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+ONBOARDING WIZARD (For New Users):
++-------------------------------------------------------------------------+
+|  Welcome to iDempiere!                              [Step 2 of 5]       |
+|-------------------------------------------------------------------------|
+|                                                                          |
+|  Let's set up your first SALES ORDER                                    |
+|                                                                          |
+|  +-------------------------------------------------------------------+  |
+|  |  [ANIMATION: Arrow pointing to Business Partner field]            |  |
+|  |                                                                   |  |
+|  |  Step 1: Select a Business Partner                                |  |
+|  |                                                                   |  |
+|  |  This is who you're selling to. Start typing a name or code.      |  |
+|  |                                                                   |  |
+|  |  [TRY IT: Type "GardenWorld" in the field above]                  |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  [BACK]                                           [NEXT]  [SKIP TOUR]   |
++-------------------------------------------------------------------------+
+
+SEARCHABLE KNOWLEDGE BASE:
++-------------------------------------------------------------------------+
+|  Search Help & Documentation                                   [X]      |
+|-------------------------------------------------------------------------|
+|  [______________________________________] [SEARCH]                       |
+|                                                                          |
+|  Results for "tax calculation":                                          |
+|  +-------------------------------------------------------------------+  |
+|  |                                                                   |  |
+|  | [WIKI] Tax Setup Guide                            [RELEVANCE: 95%]|  |
+|  |        Complete guide to configuring taxes...                     |  |
+|  |        wiki.idempiere.org/en/Tax_Configuration                    |  |
+|  |                                                                   |  |
+|  | [VIDEO] Understanding Tax in iDempiere            [RELEVANCE: 90%]|  |
+|  |         15 minute tutorial covering...                            |  |
+|  |         youtube.com/watch?v=...                                   |  |
+|  |                                                                   |  |
+|  | [FAQ] Why is my tax not calculating?              [RELEVANCE: 88%]|  |
+|  |       Common reasons: 1) Missing tax category...                  |  |
+|  |       groups.google.com/g/idempiere/c/...                         |  |
+|  |                                                                   |  |
+|  | [ISSUE] IDEMPIERE-5890: Tax calculation bug       [RELEVANCE: 75%]|  |
+|  |         Known issue affecting version 12.0.0...                   |  |
+|  |         [WORKAROUND AVAILABLE]                                    |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+EDUCATION METRICS (For Admins):
++-------------------------------------------------------------------------+
+|  User Education Dashboard                                               |
+|-------------------------------------------------------------------------|
+|                                                                          |
+|  HELP USAGE THIS MONTH:                                                  |
+|  +-------------------------------------------------------------------+  |
+|  |  [CHART: Bar graph showing help requests by window]               |  |
+|  |  Top Help Requests:                                               |  |
+|  |  1. Sales Order (234 requests)                                    |  |
+|  |  2. Purchase Order (189 requests)                                 |  |
+|  |  3. Invoice (156 requests)                                        |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  KNOWLEDGE GAPS DETECTED:                          [AI-ANALYZED]        |
+|  +-------------------------------------------------------------------+  |
+|  |  [!] Users struggling with: Bank Statement Matching               |  |
+|  |      -> Recommend: Create internal training or share wiki link    |  |
+|  |                                                                   |  |
+|  |  [!] Frequent questions about: Multi-Currency                     |  |
+|  |      -> Recommend: Add tooltip hints to currency fields           |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
+|  USER TRAINING COMPLETION:                                               |
+|  +-------------------------------------------------------------------+  |
+|  |  [PIE CHART]                                                      |  |
+|  |  - 45% Completed basic training                                   |  |
+|  |  - 30% In progress                                                |  |
+|  |  - 25% Not started                                                |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                          |
++-------------------------------------------------------------------------+
+
+================================================================================
+BENEFITS
+================================================================================
+
+WITHOUT VersionMaster:
+- Check GitHub for release notes
+- Search Wiki for migration guide
+- Search forum for discussions
+- Check JIRA for known issues
+- Manually track plugin versions
+- Hope you didn't miss anything
+- Generic Help text that doesn't answer real questions
+- Users constantly ask "how do I do X?"
+- Training is expensive and hard to maintain
+- New users are lost and frustrated
+
+WITH VersionMaster:
+- All info aggregated in one window
+- Clickable links to detailed sources
+- Known issues with workarounds visible
+- Plugin update status at a glance
+- Package revert capability if needed
+- Backup before any risky operation
+- Context-aware Help with real answers and community knowledge
+- LEARNING HUB with guided paths
+- IN-CONTEXT tips while working
+- Searchable knowledge base
+- Onboarding wizard for new users
+- Admin dashboard for training metrics
+
+================================================================================
+

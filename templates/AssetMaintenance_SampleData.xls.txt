@@ -1,0 +1,143 @@
+================================================================================
+ASSETMAINTENANCE SAMPLE DATA - EXCEL FORMAT (Converted from SQL)
+================================================================================
+Converted from: /home/red1/Projects/AssetMaintenance/data/GardenWorld_SampleData.sql
+For use with: VersionMaster Dataset Injection
+
+Notes:
+- System columns (AD_Client_ID, AD_Org_ID, Created, etc.) omitted - Ninja auto-fills
+- UUID columns omitted - Ninja auto-generates
+- Foreign keys use @TableName.Value lookup syntax
+- Sheet order matters for FK dependencies (parents before children)
+
+================================================================================
+SHEET: MP_Meter
+================================================================================
+| Name             | MaxDay |
+|------------------|--------|
+| Kilometers       | 30     |
+| Operating Hours  | 7      |
+
+================================================================================
+SHEET: A_Asset
+================================================================================
+| Value  | Name              | Description                         | A_Asset_Group_ID | M_Product_ID | AssetServiceDate | IsOwned | IsDepreciated | IsFullyDepreciated |
+|--------|-------------------|-------------------------------------|------------------|--------------|------------------|---------|---------------|--------------------|
+| VH-001 | Delivery Truck #1 | Ford F-150 for deliveries           | 50006            | 200001       | 2023-01-15       | Y       | N             | N                  |
+| VH-002 | Forklift #1       | Toyota Forklift for warehouse       | 50006            | 200001       | 2022-06-01       | Y       | N             | N                  |
+| EQ-001 | Fertilizer Mixer  | Industrial fertilizer mixing equip  | 50007            | 200002       | 2021-03-20       | Y       | N             | N                  |
+| EQ-002 | Conveyor Belt #1  | Main warehouse conveyor belt        | 50007            | 200002       | 2020-11-10       | Y       | N             | N                  |
+
+================================================================================
+SHEET: MP_JobStandar
+================================================================================
+| Name                    | JobStandarType | MaintainArea | A_Asset_Group_ID |
+|-------------------------|----------------|--------------|------------------|
+| Vehicle Oil Change      | PM             | ME           | 50006            |
+| Vehicle Tire Inspection | PM             | ME           | 50006            |
+| Forklift Battery Check  | PM             | EL           | 50006            |
+| Mixer Lubrication       | PM             | ME           | 50007            |
+| Conveyor Belt Tension   | PM             | ME           | 50007            |
+
+================================================================================
+SHEET: MP_JobStandar_Task
+================================================================================
+| MP_JobStandar_ID              | Description                     | Duration | C_UOM_ID |
+|-------------------------------|---------------------------------|----------|----------|
+| @MP_JobStandar.Vehicle Oil Change     | Drain old oil           | 0.5      | 101      |
+| @MP_JobStandar.Vehicle Oil Change     | Replace oil filter      | 0.25     | 101      |
+| @MP_JobStandar.Vehicle Oil Change     | Add new oil (5L)        | 0.25     | 101      |
+| @MP_JobStandar.Vehicle Tire Inspection| Check tire pressure     | 0.5      | 101      |
+| @MP_JobStandar.Vehicle Tire Inspection| Check tire wear pattern | 0.25     | 101      |
+| @MP_JobStandar.Forklift Battery Check | Check battery water     | 0.25     | 101      |
+| @MP_JobStandar.Forklift Battery Check | Clean battery terminals | 0.25     | 101      |
+| @MP_JobStandar.Forklift Battery Check | Test battery voltage    | 0.25     | 101      |
+| @MP_JobStandar.Mixer Lubrication      | Grease all bearings     | 1.0      | 101      |
+| @MP_JobStandar.Mixer Lubrication      | Check gear oil level    | 0.5      | 101      |
+| @MP_JobStandar.Conveyor Belt Tension  | Inspect belt condition  | 0.5      | 101      |
+| @MP_JobStandar.Conveyor Belt Tension  | Adjust tension rollers  | 1.0      | 101      |
+| @MP_JobStandar.Conveyor Belt Tension  | Lubricate drive chain   | 0.5      | 101      |
+
+================================================================================
+SHEET: MP_AssetMeter
+================================================================================
+| Value     | Name               | Amt   | DateTrx  | A_Asset_ID        | MP_Meter_ID            |
+|-----------|--------------------|-------|----------|-------------------|------------------------|
+| VH001-KM  | Truck #1 Odometer  | 45000 | @TODAY   | @A_Asset.VH-001   | @MP_Meter.Kilometers   |
+| VH002-HRS | Forklift #1 Hours  | 1200  | @TODAY   | @A_Asset.VH-002   | @MP_Meter.Operating Hours |
+| EQ001-HRS | Mixer Op. Hours    | 5600  | @TODAY   | @A_Asset.EQ-001   | @MP_Meter.Operating Hours |
+| EQ002-HRS | Conveyor Hours     | 8500  | @TODAY   | @A_Asset.EQ-002   | @MP_Meter.Operating Hours |
+
+================================================================================
+SHEET: MP_Maintain
+================================================================================
+| DocumentNo | IsChild | A_Asset_ID      | MP_JobStandar_ID                | MP_Meter_ID            | ProgrammingType | Interval | LastMP | NextMP | LastRead | CurrentMP | PromUse | Range | DateLastRun | DateNextRun | DocStatus | PriorityRule |
+|------------|---------|-----------------|----------------------------------|------------------------|-----------------|----------|--------|--------|----------|-----------|---------|-------|-------------|-------------|-----------|--------------|
+| MP-000001  | N       | @A_Asset.VH-001 | @MP_JobStandar.Vehicle Oil Change| @MP_Meter.Kilometers   | M               | 5000     | 40000  | 45000  | 45000    | 45000     | 500     | 1000  | 2025-11-01  |             | AT        | 5            |
+| MP-000002  | N       | @A_Asset.VH-001 | @MP_JobStandar.Vehicle Tire Inspection |                 | C               | 30       |        |        |          |           |         |       | 2025-12-15  | 2026-01-14  | AT        | 5            |
+| MP-000003  | N       | @A_Asset.VH-002 | @MP_JobStandar.Forklift Battery Check | @MP_Meter.Operating Hours | M       | 250      | 1000   | 1250   | 1200     | 1200      | 50      | 100   | 2025-10-20  |             | AT        | 3            |
+| MP-000004  | N       | @A_Asset.EQ-001 | @MP_JobStandar.Mixer Lubrication | @MP_Meter.Operating Hours | M          | 500      | 5500   | 6000   | 5600     | 5600      | 100     | 200   | 2025-12-01  |             | AT        | 5            |
+| MP-000005  | N       | @A_Asset.EQ-002 | @MP_JobStandar.Conveyor Belt Tension |                   | C               | 14       |        |        |          |           |         |       | 2026-01-05  | 2026-01-19  | AT        | 7            |
+
+================================================================================
+SHEET: MP_AssetMeter_Log
+================================================================================
+| MP_AssetMeter_ID          | DateTrx    | Amt | CurrentAmt | Description     |
+|---------------------------|------------|-----|------------|-----------------|
+| @MP_AssetMeter.VH001-KM   | 2025-11-01 | 500 | 40500      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-11-08 | 520 | 41020      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-11-15 | 480 | 41500      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-11-22 | 510 | 42010      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-11-29 | 495 | 42505      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-12-06 | 530 | 43035      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-12-13 | 465 | 43500      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-12-20 | 500 | 44000      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2025-12-27 | 500 | 44500      | Weekly reading  |
+| @MP_AssetMeter.VH001-KM   | 2026-01-03 | 500 | 45000      | Weekly reading  |
+| @MP_AssetMeter.VH002-HRS  | 2025-11-01 | 40  | 1040       | Weekly hours    |
+| @MP_AssetMeter.VH002-HRS  | 2025-11-15 | 45  | 1085       | Bi-weekly hours |
+| @MP_AssetMeter.VH002-HRS  | 2025-12-01 | 50  | 1135       | Bi-weekly hours |
+| @MP_AssetMeter.VH002-HRS  | 2025-12-15 | 35  | 1170       | Bi-weekly hours |
+| @MP_AssetMeter.VH002-HRS  | 2026-01-01 | 30  | 1200       | Holiday period  |
+| @MP_AssetMeter.EQ001-HRS  | 2025-11-01 | 100 | 5400       | Monthly reading |
+| @MP_AssetMeter.EQ001-HRS  | 2025-12-01 | 120 | 5520       | Monthly reading |
+| @MP_AssetMeter.EQ001-HRS  | 2026-01-01 | 80  | 5600       | Monthly reading |
+| @MP_AssetMeter.EQ002-HRS  | 2025-11-01 | 150 | 8200       | Monthly reading |
+| @MP_AssetMeter.EQ002-HRS  | 2025-12-01 | 180 | 8380       | Monthly reading |
+| @MP_AssetMeter.EQ002-HRS  | 2026-01-01 | 120 | 8500       | Monthly reading |
+
+================================================================================
+SUMMARY
+================================================================================
+
+Total: 7 sheets, 54 records
+
+| Sheet              | Records | FK Dependencies                |
+|--------------------|---------|--------------------------------|
+| MP_Meter           | 2       | None                           |
+| A_Asset            | 4       | None (uses existing IDs)       |
+| MP_JobStandar      | 5       | None (uses existing IDs)       |
+| MP_JobStandar_Task | 13      | -> MP_JobStandar               |
+| MP_AssetMeter      | 4       | -> A_Asset, MP_Meter           |
+| MP_Maintain        | 5       | -> A_Asset, MP_JobStandar, MP_Meter |
+| MP_AssetMeter_Log  | 21      | -> MP_AssetMeter               |
+
+INJECTION ORDER (respects FK constraints):
+1. MP_Meter
+2. A_Asset
+3. MP_JobStandar
+4. MP_JobStandar_Task
+5. MP_AssetMeter
+6. MP_Maintain
+7. MP_AssetMeter_Log
+
+CLEANUP ORDER (reverse):
+1. MP_AssetMeter_Log
+2. MP_Maintain
+3. MP_AssetMeter
+4. MP_JobStandar_Task
+5. MP_JobStandar
+6. A_Asset
+7. MP_Meter
+
+================================================================================
