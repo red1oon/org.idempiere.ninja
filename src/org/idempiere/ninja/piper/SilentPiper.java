@@ -18,9 +18,13 @@
  *****************************************************************************/
 package org.idempiere.ninja.piper;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,6 +34,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -3661,6 +3666,423 @@ public class SilentPiper {
         }
     }
 
+    // ========== XML-UPDATE: Apply SQL to PackOut.xml (NO database) ==========
+
+    /**
+     * Apply SQL UPDATE statements to PackOut.xml directly (no database needed).
+     * Port of sql2packout.py - preserves original XML formatting.
+     *
+     * @param packoutXml Path to PackOut.xml file
+     * @param sqlInput Path to SQL file or directory containing .sql files
+     * @param outputXml Output file path (null = overwrite input)
+     * @return Number of fields updated
+     */
+    public int xmlUpdate(String packoutXml, String sqlInput, String outputXml) throws Exception {
+        log.info("XML Update: " + packoutXml + " with " + sqlInput);
+
+        if (outputXml == null || outputXml.isEmpty()) {
+            outputXml = packoutXml;
+        }
+
+        // Collect SQL files
+        List<File> sqlFiles = new ArrayList<>();
+        File sqlPath = new File(sqlInput);
+        if (sqlPath.isDirectory()) {
+            File[] files = sqlPath.listFiles((dir, name) -> name.toLowerCase().endsWith(".sql"));
+            if (files != null) {
+                Arrays.sort(files);
+                sqlFiles.addAll(Arrays.asList(files));
+            }
+        } else {
+            sqlFiles.add(sqlPath);
+        }
+
+        log.info("PackOut: " + packoutXml);
+        log.info("SQL files: " + sqlFiles.size());
+
+        // Parse SQL to extract updates
+        // Structure: updates[table][key_type][key_value] = {field: value}
+        Map<String, Map<String, Map<String, Map<String, String>>>> updates = new HashMap<>();
+
+        for (File sqlFile : sqlFiles) {
+            log.info("  Parsing: " + sqlFile.getName());
+            parseSqlFile(sqlFile, updates);
+        }
+
+        // Count rules
+        int totalRules = 0;
+        for (Map<String, Map<String, Map<String, String>>> tableUpdates : updates.values()) {
+            for (Map<String, Map<String, String>> keyUpdates : tableUpdates.values()) {
+                totalRules += keyUpdates.size();
+            }
+        }
+        log.info("Extracted " + totalRules + " update rules");
+
+        // Read file as lines
+        List<String> lines = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(packoutXml))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                lines.add(line);
+            }
+        }
+
+        // Process line by line
+        Map<String, Integer> counts = new HashMap<>();
+        String[] xmlElements = {"AD_Element", "AD_Window", "AD_Tab", "AD_Field", "AD_Process", "AD_Form", "AD_Menu"};
+
+        int i = 0;
+        while (i < lines.size()) {
+            String line = lines.get(i);
+
+            for (String xmlElem : xmlElements) {
+                // Check for element start tag (not _ID suffix)
+                if (!(line.contains("<" + xmlElem + " ") || line.contains("<" + xmlElem + ">")) ||
+                    line.contains("</" + xmlElem + ">")) {
+                    continue;
+                }
+
+                String table = xmlElem.toUpperCase();
+                if (!updates.containsKey(table)) {
+                    continue;
+                }
+
+                // Find element end (can span 5000+ lines for AD_Window)
+                int elemStart = i;
+                int elemEnd = i;
+                int depth = 1;
+                for (int j = i + 1; j < Math.min(i + 50000, lines.size()); j++) {
+                    String jLine = lines.get(j);
+                    if ((jLine.contains("<" + xmlElem + " ") || jLine.contains("<" + xmlElem + ">")) &&
+                        !jLine.contains("</" + xmlElem + ">")) {
+                        depth++;
+                    }
+                    if (jLine.contains("</" + xmlElem + ">")) {
+                        depth--;
+                        if (depth == 0) {
+                            elemEnd = j;
+                            break;
+                        }
+                    }
+                }
+
+                // Collect tag values in this element
+                Map<String, int[]> elemTags = new HashMap<>();  // tag -> [lineIndex, value as string ref]
+                Map<String, String> elemTagValues = new HashMap<>();
+                String entityType = null;
+
+                for (int j = elemStart; j <= elemEnd; j++) {
+                    String jLine = lines.get(j);
+                    String et = getTagValue(jLine, "EntityType");
+                    if (et != null) entityType = et;
+
+                    for (String tag : new String[]{"ColumnName", "Name", "AD_Element_ID", "AD_Window_ID",
+                            "AD_Tab_ID", "AD_Field_ID", "AD_Process_ID", "AD_Form_ID", "AD_Menu_ID"}) {
+                        String val = getTagValue(jLine, tag);
+                        if (val != null) {
+                            elemTags.put(tag, new int[]{j});
+                            elemTagValues.put(tag, val);
+                        }
+                    }
+                }
+
+                // Skip core dictionary (EntityType='D')
+                if ("D".equals(entityType)) {
+                    i = elemEnd;
+                    break;
+                }
+
+                // Match with update rules
+                boolean matched = false;
+                Map<String, Map<String, Map<String, String>>> tableUpdates = updates.get(table);
+
+                for (Map.Entry<String, Map<String, Map<String, String>>> keyEntry : tableUpdates.entrySet()) {
+                    String keyType = keyEntry.getKey();
+                    if (!elemTagValues.containsKey(keyType)) continue;
+
+                    String keyVal = elemTagValues.get(keyType);
+                    Map<String, Map<String, String>> keyUpdates = keyEntry.getValue();
+
+                    if (keyUpdates.containsKey(keyVal)) {
+                        Map<String, String> valsToApply = keyUpdates.get(keyVal);
+
+                        for (Map.Entry<String, String> fieldEntry : valsToApply.entrySet()) {
+                            String field = fieldEntry.getKey();
+                            String newVal = fieldEntry.getValue();
+
+                            // Find and update the field line
+                            for (int j = elemStart; j <= elemEnd; j++) {
+                                String oldVal = getTagValue(lines.get(j), field);
+                                if (oldVal != null) {
+                                    String newLine = setTagValue(lines.get(j), field, newVal);
+                                    if (!newLine.equals(lines.get(j))) {
+                                        lines.set(j, newLine);
+                                        counts.put(xmlElem, counts.getOrDefault(xmlElem, 0) + 1);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        matched = true;
+                    }
+                }
+
+                if (matched) {
+                    i = elemEnd;
+                }
+                break;
+            }
+            i++;
+        }
+
+        // Write output
+        log.info("Writing: " + outputXml);
+        try (PrintWriter pw = new PrintWriter(new FileWriter(outputXml))) {
+            for (String line : lines) {
+                pw.println(line);
+            }
+        }
+
+        int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+        log.info("Applied field updates:");
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            log.info("  " + entry.getKey() + ": " + entry.getValue());
+        }
+        log.info("Total: " + total);
+
+        return total;
+    }
+
+    private void parseSqlFile(File sqlFile, Map<String, Map<String, Map<String, Map<String, String>>>> updates) throws Exception {
+        String content = new String(java.nio.file.Files.readAllBytes(sqlFile.toPath()));
+        // Remove comments
+        content = content.replaceAll("--.*$", "");
+
+        // Split by semicolon + newline
+        String[] statements = content.split(";\\s*\\n");
+
+        for (String stmt : statements) {
+            stmt = stmt.trim();
+            if (!stmt.toUpperCase().startsWith("UPDATE")) continue;
+
+            // Parse: UPDATE table SET col='val',... WHERE condition
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "UPDATE\\s+(\\w+)\\s+SET\\s+(.+?)\\s+WHERE\\s+(.+)",
+                java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL);
+            java.util.regex.Matcher m = p.matcher(stmt);
+
+            if (!m.matches()) continue;
+
+            String table = m.group(1).toUpperCase();
+            String setClause = m.group(2);
+            String whereClause = m.group(3);
+
+            // Parse SET values
+            Map<String, String> vals = new HashMap<>();
+            java.util.regex.Pattern setP = java.util.regex.Pattern.compile("(\\w+)\\s*=\\s*'((?:[^']|'')*)'");
+            java.util.regex.Matcher setM = setP.matcher(setClause);
+            while (setM.find()) {
+                vals.put(setM.group(1), setM.group(2).replace("''", "'"));
+            }
+
+            if (vals.isEmpty()) continue;
+
+            // Parse WHERE key
+            String keyType = null, keyVal = null;
+
+            // Check ColumnName first
+            java.util.regex.Matcher colM = java.util.regex.Pattern.compile(
+                "ColumnName\\s*=\\s*'([^']+)'", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(whereClause);
+            if (colM.find()) {
+                keyType = "ColumnName";
+                keyVal = colM.group(1);
+            } else {
+                // Check ID patterns
+                java.util.regex.Matcher idM = java.util.regex.Pattern.compile(
+                    "(AD_(?:Element|Window|Tab|Field|Process|Form|Menu)_ID)\\s*=\\s*(\\d+)",
+                    java.util.regex.Pattern.CASE_INSENSITIVE).matcher(whereClause);
+                if (idM.find()) {
+                    keyType = idM.group(1);
+                    keyVal = idM.group(2);
+                } else {
+                    // Check Name
+                    java.util.regex.Matcher nameM = java.util.regex.Pattern.compile(
+                        "(?<![A-Za-z_])Name\\s*=\\s*'([^']+)'", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(whereClause);
+                    if (nameM.find()) {
+                        keyType = "Name";
+                        keyVal = nameM.group(1);
+                    }
+                }
+            }
+
+            if (keyType != null && keyVal != null) {
+                updates.computeIfAbsent(table, k -> new HashMap<>())
+                       .computeIfAbsent(keyType, k -> new HashMap<>())
+                       .computeIfAbsent(keyVal, k -> new HashMap<>())
+                       .putAll(vals);
+            }
+        }
+    }
+
+    private String getTagValue(String line, String tag) {
+        // Match <tag>value</tag>
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("<" + tag + ">([^<]*)</" + tag + ">");
+        java.util.regex.Matcher m = p.matcher(line);
+        if (m.find()) {
+            return m.group(1);
+        }
+        // Match self-closing <tag/> or <tag />
+        if (line.matches(".*<" + tag + "\\s*/>.*")) {
+            return "";
+        }
+        return null;
+    }
+
+    private String setTagValue(String line, String tag, String value) {
+        // Replace <tag>old</tag>
+        String newLine = line.replaceAll("<" + tag + ">[^<]*</" + tag + ">",
+                                         "<" + tag + ">" + escapeXml(value) + "</" + tag + ">");
+        if (!newLine.equals(line)) {
+            return newLine;
+        }
+        // Replace <tag/> or <tag />
+        return line.replaceAll("<" + tag + "\\s*/>",
+                              "<" + tag + ">" + escapeXml(value) + "</" + tag + ">");
+    }
+
+    // ========== XML-SYNC: Sync PackOut.xml from database ==========
+
+    /**
+     * Update PackOut.xml with current database Help/Name values.
+     * Port of update_packout.py - only updates EntityType='U' elements.
+     * Requires PostgreSQL connection.
+     *
+     * @param packoutXml Path to PackOut.xml file
+     * @param outputXml Output file path (null = overwrite input)
+     * @return Number of elements updated
+     */
+    public int xmlSync(String packoutXml, String outputXml) throws Exception {
+        if (ideConn == null) {
+            throw new SQLException("Not connected to PostgreSQL database");
+        }
+
+        log.info("XML Sync: " + packoutXml + " from database");
+
+        if (outputXml == null || outputXml.isEmpty()) {
+            outputXml = packoutXml;
+        }
+
+        // Read and parse XML
+        javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+        org.w3c.dom.Document doc = builder.parse(new File(packoutXml));
+
+        Map<String, Integer> counts = new HashMap<>();
+        Map<String, Integer> skipped = new HashMap<>();
+
+        // Update each element type
+        updateElementsFromDB(doc, "AD_Element", "ColumnName",
+            "SELECT Name, PrintName, Help, Description FROM AD_Element WHERE ColumnName = ? AND AD_Client_ID = 0 AND EntityType = 'U'",
+            new String[]{"Name", "PrintName", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Window", "AD_Window_ID",
+            "SELECT Name, Help, Description FROM AD_Window WHERE AD_Window_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Tab", "AD_Tab_ID",
+            "SELECT Name, Help, Description FROM AD_Tab WHERE AD_Tab_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Field", "AD_Field_ID",
+            "SELECT Name, Help, Description FROM AD_Field WHERE AD_Field_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Process", "AD_Process_ID",
+            "SELECT Name, Help, Description FROM AD_Process WHERE AD_Process_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Form", "AD_Form_ID",
+            "SELECT Name, Help, Description FROM AD_Form WHERE AD_Form_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Help", "Description"}, counts, skipped);
+
+        updateElementsFromDB(doc, "AD_Menu", "AD_Menu_ID",
+            "SELECT Name, Description FROM AD_Menu WHERE AD_Menu_ID = ? AND EntityType = 'U'",
+            new String[]{"Name", "Description"}, counts, skipped);
+
+        // Write output
+        log.info("Writing: " + outputXml);
+        javax.xml.transform.TransformerFactory tf = javax.xml.transform.TransformerFactory.newInstance();
+        javax.xml.transform.Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "yes");
+        transformer.setOutputProperty(javax.xml.transform.OutputKeys.ENCODING, "UTF-8");
+        transformer.transform(new javax.xml.transform.dom.DOMSource(doc),
+                             new javax.xml.transform.stream.StreamResult(new File(outputXml)));
+
+        int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+        int totalSkipped = skipped.values().stream().mapToInt(Integer::intValue).sum();
+
+        log.info("Updated: " + total + " elements (EntityType='U')");
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            if (entry.getValue() > 0) {
+                log.info("  " + entry.getKey() + ": " + entry.getValue());
+            }
+        }
+        log.info("Skipped: " + totalSkipped + " core elements (EntityType!='U')");
+
+        return total;
+    }
+
+    private void updateElementsFromDB(org.w3c.dom.Document doc, String elementName, String keyField,
+                                      String sql, String[] updateFields,
+                                      Map<String, Integer> counts, Map<String, Integer> skipped) throws SQLException {
+        org.w3c.dom.NodeList nodes = doc.getElementsByTagName(elementName);
+
+        for (int i = 0; i < nodes.getLength(); i++) {
+            org.w3c.dom.Element elem = (org.w3c.dom.Element) nodes.item(i);
+
+            // Check EntityType
+            org.w3c.dom.NodeList etNodes = elem.getElementsByTagName("EntityType");
+            String entityType = etNodes.getLength() > 0 ? etNodes.item(0).getTextContent() : null;
+
+            if (!"U".equals(entityType)) {
+                skipped.put(elementName, skipped.getOrDefault(elementName, 0) + 1);
+                continue;
+            }
+
+            // Get key value
+            org.w3c.dom.NodeList keyNodes = elem.getElementsByTagName(keyField);
+            if (keyNodes.getLength() == 0) continue;
+
+            String keyValue = keyNodes.item(0).getTextContent();
+            if (keyValue == null || keyValue.isEmpty()) continue;
+
+            try (PreparedStatement ps = ideConn.prepareStatement(sql)) {
+                if (keyField.endsWith("_ID")) {
+                    ps.setInt(1, Integer.parseInt(keyValue));
+                } else {
+                    ps.setString(1, keyValue);
+                }
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        for (int f = 0; f < updateFields.length; f++) {
+                            String fieldName = updateFields[f];
+                            String value = rs.getString(f + 1);
+
+                            org.w3c.dom.NodeList fieldNodes = elem.getElementsByTagName(fieldName);
+                            if (fieldNodes.getLength() > 0) {
+                                fieldNodes.item(0).setTextContent(value != null ? value : "");
+                            }
+                        }
+                        counts.put(elementName, counts.getOrDefault(elementName, 0) + 1);
+                    }
+                }
+            } catch (NumberFormatException e) {
+                // Skip invalid IDs
+            }
+        }
+    }
+
     // ========== Main ==========
 
     public static void main(String[] args) {
@@ -3880,6 +4302,39 @@ public class SilentPiper {
                     System.out.println("Deleted " + cleaned + " records from iDempiere");
                     break;
 
+                // ===== XML TOOLS (PackOut.xml manipulation) =====
+                case "xml-update":
+                    // Apply SQL UPDATE statements to PackOut.xml (NO database needed)
+                    if (args.length < 4) {
+                        System.out.println("Missing arguments");
+                        System.out.println("Usage: SilentPiper <sqlite.db> xml-update <packout.xml> <sql_file_or_dir> [output.xml]");
+                        System.out.println("Example: SilentPiper ninja.db xml-update PackOut.xml ./sql_updates/");
+                        System.out.println("  - Applies SQL UPDATE statements to PackOut.xml directly");
+                        System.out.println("  - NO database connection needed (pure XML transformation)");
+                        return;
+                    }
+                    String xmlUpdateOutput = args.length > 4 ? args[4] : null;
+                    int xmlUpdated = piper.xmlUpdate(args[2], args[3], xmlUpdateOutput);
+                    System.out.println("Updated " + xmlUpdated + " fields in PackOut.xml");
+                    break;
+
+                case "xml-sync":
+                    // Sync PackOut.xml from database (requires PostgreSQL)
+                    if (args.length < 3) {
+                        System.out.println("Missing arguments");
+                        System.out.println("Usage: SilentPiper <sqlite.db> xml-sync <packout.xml> [output.xml]");
+                        System.out.println("Example: SilentPiper ninja.db xml-sync PackOut.xml PackOut_synced.xml");
+                        System.out.println("  - Updates PackOut.xml with current database values");
+                        System.out.println("  - Only updates EntityType='U' (user/module elements)");
+                        System.out.println("  - Requires PostgreSQL connection");
+                        return;
+                    }
+                    connectToIde(piper, args);
+                    String xmlSyncOutput = args.length > 3 ? args[3] : null;
+                    int xmlSynced = piper.xmlSync(args[2], xmlSyncOutput);
+                    System.out.println("Synced " + xmlSynced + " elements from database");
+                    break;
+
                 default:
                     System.out.println("Unknown command: " + command);
                     printUsage();
@@ -3933,6 +4388,10 @@ public class SilentPiper {
         System.out.println("HISTORY:");
         System.out.println("  history [limit]             - Show operation history");
         System.out.println();
+        System.out.println("XML TOOLS (PackOut.xml manipulation):");
+        System.out.println("  xml-update <xml> <sql> [out]  - Apply SQL UPDATEs to PackOut.xml (OFFLINE)");
+        System.out.println("  xml-sync <xml> [out]          - Sync PackOut.xml from database");
+        System.out.println();
         System.out.println("Examples:");
         System.out.println("  # Complete Ninja workflow (Excel → 2Pack, no iDempiere runtime):");
         System.out.println("  SilentPiper ninja.db stage HRMIS.xlsx");
@@ -3945,5 +4404,9 @@ public class SilentPiper {
         System.out.println("  SilentPiper ninja.db applied GardenWorld_SampleData");
         System.out.println("  SilentPiper ninja.db clean-data GardenWorld_SampleData");
         System.out.println("  SilentPiper ninja.db packout GW_Sample ./output 11");
+        System.out.println();
+        System.out.println("  # XML tools (update existing PackOut.xml):");
+        System.out.println("  SilentPiper ninja.db xml-update PackOut.xml ./sql_updates/");
+        System.out.println("  SilentPiper ninja.db xml-sync PackOut.xml PackOut_synced.xml");
     }
 }

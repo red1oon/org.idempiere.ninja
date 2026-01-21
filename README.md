@@ -421,6 +421,68 @@ java -jar SilentPiper.jar ninja.db apply-data GW_Sample
 
 ---
 
+# XML Tools - PackOut.xml Manipulation
+
+Built-in commands for modifying existing PackOut.xml files.
+
+## xml-update (OFFLINE - No Database)
+
+Apply SQL UPDATE statements to PackOut.xml directly without database connection.
+
+```bash
+# Apply single SQL file
+SilentPiper ninja.db xml-update PackOut.xml updates.sql
+
+# Apply all SQL files from directory
+SilentPiper ninja.db xml-update PackOut.xml ./sql_updates/
+
+# Output to different file
+SilentPiper ninja.db xml-update PackOut.xml updates.sql PackOut_fixed.xml
+```
+
+**SQL Format Supported:**
+```sql
+-- Update by ColumnName (AD_Element)
+UPDATE AD_Element SET Name='New Name', Help='New help' WHERE ColumnName='MyColumn';
+
+-- Update by ID (AD_Window, AD_Tab, AD_Field, etc.)
+UPDATE AD_Window SET Name='Employee Window' WHERE AD_Window_ID=123;
+
+-- Update by Name (AD_Menu)
+UPDATE AD_Menu SET Name='HR Menu' WHERE Name='Old Menu Name';
+```
+
+**Features:**
+- NO database connection needed (pure XML transformation)
+- Preserves original XML formatting
+- Handles large AD_Window elements (5000+ lines)
+- Skips EntityType='D' (core dictionary)
+- Applies ALL matching rules per element
+
+**Use Case:** Update Help text, Names, translations in existing 2Pack without re-exporting.
+
+## xml-sync (Requires PostgreSQL)
+
+Sync PackOut.xml with current database values.
+
+```bash
+# Sync and overwrite
+SilentPiper ninja.db xml-sync PackOut.xml
+
+# Sync to new file
+SilentPiper ninja.db xml-sync PackOut.xml PackOut_synced.xml
+```
+
+**Features:**
+- Updates Name, Help, Description from database
+- Only updates EntityType='U' (user/module elements)
+- Skips core dictionary (EntityType='D')
+- Supports: AD_Element, AD_Window, AD_Tab, AD_Field, AD_Process, AD_Form, AD_Menu
+
+**Use Case:** Pull latest Help text from database into existing 2Pack.
+
+---
+
 ## License
 
 GPL v2 - Free for commercial and non-commercial use.
