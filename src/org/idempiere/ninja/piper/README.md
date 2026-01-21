@@ -1,15 +1,38 @@
 # SilentPiper - Offline iDempiere Model & Data Tool
 
-Standalone tool for creating and deploying iDempiere AD models and data without requiring iDempiere runtime.
+Standalone tool for creating and deploying iDempiere AD models and data **without requiring iDempiere runtime**.
+
+## Why "Silent"?
+
+**Silent = No iDempiere Runtime Required**
+
+Traditional iDempiere development requires:
+- Running iDempiere server
+- OSGi container
+- Full application context
+
+SilentPiper bypasses all of that:
+- Direct JDBC to PostgreSQL
+- Pure Java + SQLite for staging
+- PIPO-compatible output
 
 ## Overview
 
 SilentPiper enables the complete Ninja workflow:
 ```
 Excel → SQLite → 2Pack → PostgreSQL
+       (silent)  (silent)  (silent)
 ```
 
-All operations can be performed offline, with optional PostgreSQL connection for deployment.
+| Operation | iDempiere Required? | Database Required? |
+|-----------|--------------------|--------------------|
+| `stage` | No | SQLite only |
+| `packout-model` | No | SQLite only |
+| `packout` | No | SQLite only |
+| `import-silent` | No | PostgreSQL (JDBC) |
+| `apply-data` | No | PostgreSQL (JDBC) |
+| `import` | Yes | PostgreSQL + iDempiere |
+| `apply` | Yes | PostgreSQL + iDempiere |
 
 ## Quick Start
 
@@ -57,20 +80,33 @@ java -jar SilentPiper.jar ninja.db import-silent ./output/HRMIS_Model_1_0_0.zip
 - AD_Field (tab fields)
 - AD_Menu (navigation entries)
 
-### Silent Import (ZIP → PostgreSQL)
+### Silent Import (ZIP → PostgreSQL) - NO iDempiere Runtime!
 
-| Command | Description |
-|---------|-------------|
-| `import-silent <2pack.zip>` | Import 2Pack directly to PostgreSQL via JDBC |
-| `import <2pack.zip>` | Import using iDempiere PIPO (requires runtime) |
-| `validate <2pack.zip>` | Validate 2Pack structure (dry run) |
+| Command | Description | iDempiere? |
+|---------|-------------|------------|
+| `import-silent <2pack.zip>` | Import 2Pack directly via JDBC | **No** |
+| `apply-data <pack>` | Insert staged data directly | **No** |
+| `import <2pack.zip>` | Import using iDempiere PIPO | Yes |
+| `validate <2pack.zip>` | Validate 2Pack structure | Yes |
 
-**import-silent** features:
-- No iDempiere runtime required
-- SAX-based XML parsing
-- INSERT or UPDATE based on UUID
-- Automatic column detection via JDBC metadata
-- Supports AD_*, MP_*, A_ASSET* tables
+**import-silent** - The Key Silent Feature:
+```
+2Pack.zip → SAX Parser → SQL INSERT/UPDATE → PostgreSQL
+              (no iDempiere classes needed)
+```
+
+How it works:
+1. Extracts `PackOut.xml` from ZIP
+2. Parses XML using SAX (memory efficient)
+3. Detects table columns via JDBC metadata
+4. Generates INSERT or UPDATE based on UUID existence
+5. Commits transaction on success
+
+Supported tables:
+- All `AD_*` tables (Element, Table, Column, Window, Tab, Field, Menu, Process)
+- All `MP_*` tables (Maintenance module)
+- All `A_ASSET*` tables (Asset module)
+- Any table following iDempiere conventions (`TableName_ID`, `TableName_UU`)
 
 ### SQL Data Operations
 
