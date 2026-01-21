@@ -3387,6 +3387,7 @@ public class SilentPiper {
             }
 
             // Parse XML using SAX
+            System.out.println("\n=== Silent Import Started ===");
             SAXParserFactory factory = SAXParserFactory.newInstance();
             SAXParser parser = factory.newSAXParser();
             SilentImportHandler handler = new SilentImportHandler();
@@ -3394,15 +3395,42 @@ public class SilentPiper {
 
             importedCount = handler.getImportedCount();
 
+            // Print summary
+            System.out.println("\n=== Import Summary ===");
+            System.out.println("Total records: " + importedCount);
+            System.out.println("  Inserted: " + handler.getInsertCount());
+            System.out.println("  Updated:  " + handler.getUpdateCount());
+
+            if (!handler.getElementCounts().isEmpty()) {
+                System.out.println("\nBy element type:");
+                for (Map.Entry<String, Integer> entry : handler.getElementCounts().entrySet()) {
+                    System.out.println("  " + entry.getKey() + ": " + entry.getValue());
+                }
+            }
+
+            if (!handler.getSkippedElements().isEmpty()) {
+                System.out.println("\n[WARN] Skipped elements (no handler):");
+                for (String elem : handler.getSkippedElements()) {
+                    System.out.println("  - " + elem);
+                }
+            }
+
+            if (!handler.getMissingTables().isEmpty()) {
+                System.out.println("\n[WARN] Tables not in database:");
+                for (String table : handler.getMissingTables()) {
+                    System.out.println("  - " + table);
+                }
+            }
+
             if (errors == 0) {
                 ideConn.commit();
                 sqliteConn.commit();
                 completeOperation(operationId, "SUCCESS");
-                log.info("Import committed: " + importedCount + " records");
+                System.out.println("\nStatus: SUCCESS (committed)");
             } else {
                 ideConn.rollback();
                 completeOperation(operationId, "PARTIAL");
-                log.warning("Import completed with errors: " + errors);
+                System.out.println("\nStatus: PARTIAL (rolled back, " + errors + " errors)");
             }
 
             if (zipFile != null) zipFile.close();
@@ -3424,6 +3452,11 @@ public class SilentPiper {
         private Map<String, String> currentRecord = new HashMap<>();
         private StringBuilder textContent = new StringBuilder();
         private int importedCount = 0;
+        private int insertCount = 0;
+        private int updateCount = 0;
+        private java.util.Set<String> skippedElements = new java.util.HashSet<>();
+        private java.util.Set<String> missingTables = new java.util.HashSet<>();
+        private Map<String, Integer> elementCounts = new HashMap<>();
 
         // Tables we know how to import
         private static final java.util.Set<String> SUPPORTED_TABLES = new java.util.HashSet<>(
@@ -3437,6 +3470,14 @@ public class SilentPiper {
             textContent.setLength(0);
 
             String upperName = qName.toUpperCase();
+
+            // Check if this looks like a table element (has underscore, not a field name)
+            boolean looksLikeTable = qName.contains("_") &&
+                                     !qName.equals("AD_Client_ID") &&
+                                     !qName.endsWith("_ID") &&
+                                     !qName.endsWith("_UU") &&
+                                     Character.isUpperCase(qName.charAt(0));
+
             if (SUPPORTED_TABLES.contains(upperName) ||
                 upperName.startsWith("AD_") || upperName.startsWith("MP_") ||
                 upperName.startsWith("A_ASSET")) {
@@ -3446,6 +3487,9 @@ public class SilentPiper {
                 for (int i = 0; i < attrs.getLength(); i++) {
                     currentRecord.put("_attr_" + attrs.getQName(i), attrs.getValue(i));
                 }
+            } else if (looksLikeTable && currentElement == null) {
+                // This looks like a table element but we don't have a handler
+                skippedElements.add(qName);
             }
         }
 
@@ -3478,6 +3522,11 @@ public class SilentPiper {
         }
 
         public int getImportedCount() { return importedCount; }
+        public int getInsertCount() { return insertCount; }
+        public int getUpdateCount() { return updateCount; }
+        public java.util.Set<String> getSkippedElements() { return skippedElements; }
+        public java.util.Set<String> getMissingTables() { return missingTables; }
+        public Map<String, Integer> getElementCounts() { return elementCounts; }
 
         private void importRecord(String tableName, Map<String, String> record) throws SQLException {
             // Skip if no meaningful data
@@ -3486,6 +3535,14 @@ public class SilentPiper {
             // Get table metadata
             String pkColumn = tableName.toLowerCase() + "_id";
             String uuColumn = tableName.toLowerCase() + "_uu";
+
+            // Check if table exists
+            java.util.Set<String> dbColumns = getTableColumns(tableName.toLowerCase());
+            if (dbColumns.isEmpty()) {
+                missingTables.add(tableName);
+                System.out.println("  [SKIP] Table not in database: " + tableName);
+                return;
+            }
 
             // Check if record exists (by UUID or ID)
             String uuid = record.get(uuColumn.toUpperCase());
@@ -3504,16 +3561,28 @@ public class SilentPiper {
                 }
             }
 
+            // Get record identifier for logging
+            String recordName = record.getOrDefault("NAME",
+                               record.getOrDefault("COLUMNNAME",
+                               record.getOrDefault("TABLENAME",
+                               record.getOrDefault(pkColumn.toUpperCase(), "?"))));
+
             if (exists) {
                 // UPDATE existing record
                 updateRecord(tableName, record, uuColumn, uuid);
+                updateCount++;
+                System.out.println("  [UPDATE] " + tableName + ": " + recordName);
             } else {
                 // INSERT new record
                 insertRecord(tableName, record, pkColumn);
+                insertCount++;
+                System.out.println("  [INSERT] " + tableName + ": " + recordName);
             }
 
-            logDetail(tableName, record.getOrDefault("NAME", record.getOrDefault("COLUMNNAME", "")),
-                     exists ? "UPDATE" : "INSERT", "OK");
+            // Track counts by element type
+            elementCounts.put(tableName, elementCounts.getOrDefault(tableName, 0) + 1);
+
+            logDetail(tableName, recordName, exists ? "UPDATE" : "INSERT", "OK");
         }
 
         private void insertRecord(String tableName, Map<String, String> record, String pkColumn) throws SQLException {
@@ -3678,10 +3747,15 @@ public class SilentPiper {
      * @return Number of fields updated
      */
     public int xmlUpdate(String packoutXml, String sqlInput, String outputXml) throws Exception {
-        log.info("XML Update: " + packoutXml + " with " + sqlInput);
+        System.out.println("\n=== XML Update Started ===");
+        System.out.println("PackOut: " + packoutXml);
+        System.out.println("SQL source: " + sqlInput);
 
         if (outputXml == null || outputXml.isEmpty()) {
             outputXml = packoutXml;
+            System.out.println("Output: (in-place)");
+        } else {
+            System.out.println("Output: " + outputXml);
         }
 
         // Collect SQL files
@@ -3697,26 +3771,30 @@ public class SilentPiper {
             sqlFiles.add(sqlPath);
         }
 
-        log.info("PackOut: " + packoutXml);
-        log.info("SQL files: " + sqlFiles.size());
+        System.out.println("\nSQL files found: " + sqlFiles.size());
 
         // Parse SQL to extract updates
         // Structure: updates[table][key_type][key_value] = {field: value}
         Map<String, Map<String, Map<String, Map<String, String>>>> updates = new HashMap<>();
 
         for (File sqlFile : sqlFiles) {
-            log.info("  Parsing: " + sqlFile.getName());
+            System.out.println("  Parsing: " + sqlFile.getName());
             parseSqlFile(sqlFile, updates);
         }
 
-        // Count rules
+        // Count and display rules
         int totalRules = 0;
-        for (Map<String, Map<String, Map<String, String>>> tableUpdates : updates.values()) {
-            for (Map<String, Map<String, String>> keyUpdates : tableUpdates.values()) {
-                totalRules += keyUpdates.size();
+        System.out.println("\nUpdate rules extracted:");
+        for (Map.Entry<String, Map<String, Map<String, Map<String, String>>>> tableEntry : updates.entrySet()) {
+            String table = tableEntry.getKey();
+            int tableRules = 0;
+            for (Map<String, Map<String, String>> keyUpdates : tableEntry.getValue().values()) {
+                tableRules += keyUpdates.size();
             }
+            System.out.println("  " + table + ": " + tableRules + " rules");
+            totalRules += tableRules;
         }
-        log.info("Extracted " + totalRules + " update rules");
+        System.out.println("Total: " + totalRules + " rules");
 
         // Read file as lines
         List<String> lines = new ArrayList<>();
@@ -3836,7 +3914,7 @@ public class SilentPiper {
         }
 
         // Write output
-        log.info("Writing: " + outputXml);
+        System.out.println("\nWriting: " + outputXml);
         try (PrintWriter pw = new PrintWriter(new FileWriter(outputXml))) {
             for (String line : lines) {
                 pw.println(line);
@@ -3844,11 +3922,21 @@ public class SilentPiper {
         }
 
         int total = counts.values().stream().mapToInt(Integer::intValue).sum();
-        log.info("Applied field updates:");
+
+        System.out.println("\n=== XML Update Summary ===");
+        System.out.println("Fields updated by element type:");
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            log.info("  " + entry.getKey() + ": " + entry.getValue());
+            System.out.println("  " + entry.getKey() + ": " + entry.getValue());
         }
-        log.info("Total: " + total);
+        System.out.println("Total fields updated: " + total);
+
+        if (total == 0 && totalRules > 0) {
+            System.out.println("\n[WARN] No fields updated despite having " + totalRules + " rules.");
+            System.out.println("       Possible reasons:");
+            System.out.println("       - Element names in SQL don't match PackOut.xml");
+            System.out.println("       - WHERE keys (ColumnName, ID, Name) don't match");
+            System.out.println("       - Elements have EntityType='D' (core, skipped)");
+        }
 
         return total;
     }
@@ -3966,10 +4054,15 @@ public class SilentPiper {
             throw new SQLException("Not connected to PostgreSQL database");
         }
 
-        log.info("XML Sync: " + packoutXml + " from database");
+        System.out.println("\n=== XML Sync Started ===");
+        System.out.println("PackOut: " + packoutXml);
+        System.out.println("Database: " + ideConn.getMetaData().getURL());
 
         if (outputXml == null || outputXml.isEmpty()) {
             outputXml = packoutXml;
+            System.out.println("Output: (in-place)");
+        } else {
+            System.out.println("Output: " + outputXml);
         }
 
         // Read and parse XML
@@ -3979,6 +4072,8 @@ public class SilentPiper {
 
         Map<String, Integer> counts = new HashMap<>();
         Map<String, Integer> skipped = new HashMap<>();
+
+        System.out.println("\nSyncing elements from database...");
 
         // Update each element type
         updateElementsFromDB(doc, "AD_Element", "ColumnName",
@@ -4010,7 +4105,7 @@ public class SilentPiper {
             new String[]{"Name", "Description"}, counts, skipped);
 
         // Write output
-        log.info("Writing: " + outputXml);
+        System.out.println("\nWriting: " + outputXml);
         javax.xml.transform.TransformerFactory tf = javax.xml.transform.TransformerFactory.newInstance();
         javax.xml.transform.Transformer transformer = tf.newTransformer();
         transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "yes");
@@ -4021,13 +4116,15 @@ public class SilentPiper {
         int total = counts.values().stream().mapToInt(Integer::intValue).sum();
         int totalSkipped = skipped.values().stream().mapToInt(Integer::intValue).sum();
 
-        log.info("Updated: " + total + " elements (EntityType='U')");
+        System.out.println("\n=== XML Sync Summary ===");
+        System.out.println("Elements synced (EntityType='U'):");
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
             if (entry.getValue() > 0) {
-                log.info("  " + entry.getKey() + ": " + entry.getValue());
+                System.out.println("  " + entry.getKey() + ": " + entry.getValue());
             }
         }
-        log.info("Skipped: " + totalSkipped + " core elements (EntityType!='U')");
+        System.out.println("Total synced: " + total);
+        System.out.println("\nSkipped (EntityType!='U'): " + totalSkipped);
 
         return total;
     }
