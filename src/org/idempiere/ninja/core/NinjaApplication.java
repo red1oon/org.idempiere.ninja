@@ -26,6 +26,7 @@ import org.eclipse.equinox.app.IApplication;
 import org.eclipse.equinox.app.IApplicationContext;
 import org.idempiere.ninja.generator.PluginGenerator;
 import org.idempiere.ninja.generator.TwoPackGenerator;
+import org.idempiere.ninja.test.NinjaProcessorTest;
 import org.idempiere.ninja.validator.ExcelValidator;
 
 /**
@@ -44,10 +45,12 @@ import org.idempiere.ninja.validator.ExcelValidator;
  *   -b    Generate 2Pack.zip only
  *   -c    Create AD_Package_Exp records only
  *   -d    Generate OSGI plugin structure only
+ *   -t    Test mode - run with rollback (CRUD tests included)
  *   -o    Output directory (default: same as Excel file)
  *   -v    Verbose logging
  *
  * Default (no options): Execute all modes (-abcd)
+ * Test mode (-t): Runs injection with rollback, includes CRUD tests
  *
  * @author iDempiere Community
  */
@@ -58,6 +61,7 @@ public class NinjaApplication implements IApplication {
     private boolean modeGenerate2Pack = false; // -b (standalone OK)
     private boolean modeCreatePackExp = false; // -c (requires DB)
     private boolean modeGeneratePlugin = false; // -d (standalone OK)
+    private boolean modeTest = false;          // -t (test with rollback)
     private boolean verbose = false;
     private boolean requiresDB = false;        // true if -a or -c selected
 
@@ -110,6 +114,28 @@ public class NinjaApplication implements IApplication {
                 return Integer.valueOf(1);
             }
             log("Excel validation passed!");
+
+            // Test mode - run with rollback
+            if (modeTest) {
+                log("\n=== Mode T: Test Mode (with rollback) ===");
+                NinjaProcessorTest test = new NinjaProcessorTest()
+                        .setClientId(11)  // GardenWorld
+                        .setVerbose(verbose)
+                        .setRunCrudTests(true)
+                        .setSilentMode(true);
+
+                NinjaProcessorTest.TestResult result = test.runTestWithRollback(excelFilePath);
+
+                System.out.println("\n" + result);
+
+                if (!result.success) {
+                    logError("Test failed");
+                    return Integer.valueOf(1);
+                }
+
+                log("Test completed successfully with rollback");
+                return IApplication.EXIT_OK;
+            }
 
             // Create transaction
             trxName = Trx.createTrxName("Ninja");
@@ -212,6 +238,10 @@ public class NinjaApplication implements IApplication {
                             break;
                         case 'd':
                             modeGeneratePlugin = true;
+                            modesSpecified = true;
+                            break;
+                        case 't':
+                            modeTest = true;
                             modesSpecified = true;
                             break;
                         case 'v':
@@ -318,6 +348,7 @@ public class NinjaApplication implements IApplication {
         System.out.println("  -b    Generate 2Pack.zip for distribution");
         System.out.println("  -c    Create AD_Package_Exp records for future changes");
         System.out.println("  -d    Generate complete OSGI plugin structure");
+        System.out.println("  -t    Test mode (inject with rollback, includes CRUD tests)");
         System.out.println("  -o    Output directory (default: same as Excel file)");
         System.out.println("  -v    Verbose logging");
         System.out.println();
@@ -328,6 +359,16 @@ public class NinjaApplication implements IApplication {
         System.out.println("  ./RUN_Ninja.sh MyModule.xls -a        # DB inject only");
         System.out.println("  ./RUN_Ninja.sh MyModule.xls -bd       # 2Pack + Plugin");
         System.out.println("  ./RUN_Ninja.sh MyModule.xls -o /tmp   # Custom output dir");
+        System.out.println("  ./RUN_Ninja.sh MyModule.xls -t        # Test with rollback");
+        System.out.println("  ./RUN_Ninja.sh MyModule.xls -tv       # Verbose test");
+        System.out.println();
+        System.out.println("Test mode asserts:");
+        System.out.println("  - AD models created (Tables, Columns, Windows, Menus)");
+        System.out.println("  - Master-Detail relationships correct");
+        System.out.println("  - List references populated");
+        System.out.println("  - CRUD operations work (Create, Read, Update, Delete)");
+        System.out.println("  - All changes rolled back after test");
+        System.out.println("  NOTE: AD_PInstance records persist (audit log behavior)");
         System.out.println();
     }
 

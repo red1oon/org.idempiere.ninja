@@ -1,268 +1,200 @@
 #!/usr/bin/env python3
 """
 Apply SQL UPDATE statements to PackOut.xml directly (no database needed).
-
-Parses SQL files for UPDATE statements and applies Help/Name/Description
-values to matching elements in PackOut.xml.
+Uses simple string replacement to preserve original XML formatting.
 
 Usage:
     python3 sql2packout.py <packout.xml> <sql_file_or_dir> [output.xml]
-
-Examples:
-    python3 sql2packout.py PackOut.xml MP_Help_Update.sql
-    python3 sql2packout.py PackOut.xml ./scripts/
-    python3 sql2packout.py PackOut.xml ./scripts/ updated_PackOut.xml
 """
-import xml.etree.ElementTree as ET
 import re
 import sys
 import os
 import glob
 
-def print_usage():
+if len(sys.argv) < 3:
     print(__doc__)
     sys.exit(1)
-
-if len(sys.argv) < 3:
-    print_usage()
 
 input_xml = sys.argv[1]
 sql_input = sys.argv[2]
 output_xml = sys.argv[3] if len(sys.argv) > 3 else input_xml
 
-if not os.path.exists(input_xml):
-    print(f"Error: PackOut.xml not found: {input_xml}")
-    sys.exit(1)
-
 # Collect SQL files
 sql_files = []
 if os.path.isdir(sql_input):
     sql_files = sorted(glob.glob(os.path.join(sql_input, "*.sql")))
-elif os.path.isfile(sql_input):
-    sql_files = [sql_input]
 else:
-    print(f"Error: SQL input not found: {sql_input}")
-    sys.exit(1)
+    sql_files = [sql_input]
 
 print(f"PackOut: {input_xml}")
 print(f"SQL files: {len(sql_files)}")
 
-# Parse SQL files to extract UPDATE mappings
-updates = {
-    'AD_Element': {},    # ColumnName -> {Name, PrintName, Help, Description}
-    'AD_Window': {},     # Name or ID -> {Name, Help, Description}
-    'AD_Tab': {},        # ID -> {Name, Help, Description}
-    'AD_Field': {},      # ID -> {Name, Help, Description, IsCentrallyMaintained}
-    'AD_Process': {},    # ID -> {Name, Help, Description}
-    'AD_Form': {},       # ID -> {Name, Help, Description}
-    'AD_Menu': {},       # ID -> {Name, Description}
-}
+# Parse SQL to extract updates
+# Structure: updates[table][key_type][key_value] = {field: value, ...}
+updates = {}
 
-def extract_string(match):
-    """Extract string value, handling quotes"""
-    if match:
-        val = match.strip()
-        if val.startswith("'") and val.endswith("'"):
-            val = val[1:-1]
-        return val.replace("''", "'")  # SQL escape
-    return None
-
-def parse_sql_file(filepath):
-    """Parse SQL file for UPDATE statements"""
+def parse_sql(filepath):
     with open(filepath, 'r') as f:
         content = f.read()
-
-    # Remove SQL comments
     content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)
 
-    # Split into statements
-    statements = re.split(r';\s*\n', content)
-
-    for stmt in statements:
+    for stmt in re.split(r';\s*\n', content):
         stmt = stmt.strip()
         if not stmt.upper().startswith('UPDATE'):
             continue
 
-        # Parse UPDATE table SET ... WHERE ...
-        match = re.match(r'UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+)', stmt, re.IGNORECASE | re.DOTALL)
-        if not match:
+        m = re.match(r'UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+)', stmt, re.I | re.DOTALL)
+        if not m:
             continue
 
-        table = match.group(1).upper()
-        set_clause = match.group(2)
-        where_clause = match.group(3)
+        table, set_clause, where_clause = m.groups()
+        table = table.upper()
 
-        # Extract SET values
-        values = {}
-        # Match field = 'value' or field = value patterns
-        set_patterns = re.findall(r"(\w+)\s*=\s*(?:'((?:[^']|'')*)'|(\w+))", set_clause)
-        for field, str_val, other_val in set_patterns:
-            field_upper = field.upper()
-            val = str_val if str_val else other_val
-            if val:
-                val = val.replace("''", "'")
-            values[field_upper] = val
+        # Get SET values
+        vals = {}
+        for field, val in re.findall(r"(\w+)\s*=\s*'((?:[^']|'')*)'", set_clause):
+            vals[field] = val.replace("''", "'")
 
-        # Extract WHERE key
-        key = None
+        if not vals:
+            continue
 
-        # Try ID-based WHERE
-        id_match = re.search(r'(\w+_ID)\s*=\s*(\d+)', where_clause, re.IGNORECASE)
-        if id_match:
-            key = ('ID', id_match.group(2))
+        # Get WHERE key - check ColumnName FIRST before ID patterns
+        # (AD_Client_ID=0 appears in WHERE but is not the lookup key)
+        key_type = key_val = None
+        if m2 := re.search(r"ColumnName\s*=\s*'([^']+)'", where_clause, re.I):
+            key_type, key_val = 'ColumnName', m2.group(1)
+        elif m2 := re.search(r"(AD_(?:Element|Window|Tab|Field|Process|Form|Menu)_ID)\s*=\s*(\d+)", where_clause, re.I):
+            key_type, key_val = m2.group(1), m2.group(2)
+        elif m2 := re.search(r"(?<![A-Za-z_])Name\s*=\s*'([^']+)'", where_clause, re.I):
+            key_type, key_val = 'Name', m2.group(1)
 
-        # Try ColumnName WHERE (for AD_Element)
-        col_match = re.search(r"ColumnName\s*=\s*'([^']+)'", where_clause, re.IGNORECASE)
-        if col_match:
-            key = ('ColumnName', col_match.group(1))
+        if key_type and key_val:
+            if table not in updates:
+                updates[table] = {}
+            if key_type not in updates[table]:
+                updates[table][key_type] = {}
+            # Merge values (later files override earlier)
+            if key_val not in updates[table][key_type]:
+                updates[table][key_type][key_val] = {}
+            updates[table][key_type][key_val].update(vals)
 
-        # Try Name WHERE (for AD_Window)
-        name_match = re.search(r"(?<!\w)Name\s*=\s*'([^']+)'", where_clause, re.IGNORECASE)
-        if name_match and not key:
-            key = ('Name', name_match.group(1))
+for f in sql_files:
+    print(f"  Parsing: {os.path.basename(f)}")
+    parse_sql(f)
 
-        if key and values:
-            if table == 'AD_ELEMENT':
-                if key[0] == 'ColumnName':
-                    updates['AD_Element'][key[1]] = values
-            elif table == 'AD_WINDOW':
-                if key[0] == 'Name':
-                    updates['AD_Window'][('Name', key[1])] = values
-                elif key[0] == 'ID':
-                    updates['AD_Window'][('ID', key[1])] = values
-            elif table == 'AD_TAB':
-                if key[0] == 'ID':
-                    updates['AD_Tab'][key[1]] = values
-                elif key[0] == 'Name':
-                    # Tab by name - need window context, store for matching
-                    updates['AD_Tab'][('Name', key[1])] = values
-            elif table == 'AD_FIELD':
-                if key[0] == 'ID':
-                    updates['AD_Field'][key[1]] = values
-            elif table == 'AD_PROCESS':
-                if key[0] == 'ID':
-                    updates['AD_Process'][key[1]] = values
-            elif table == 'AD_FORM':
-                if key[0] == 'ID':
-                    updates['AD_Form'][key[1]] = values
-            elif table == 'AD_MENU':
-                if key[0] == 'ID':
-                    updates['AD_Menu'][key[1]] = values
+# Count rules
+total_rules = sum(len(keys) for table in updates.values() for keys in table.values())
+print(f"\nExtracted {total_rules} update rules")
 
-# Parse all SQL files
-for sql_file in sql_files:
-    print(f"  Parsing: {os.path.basename(sql_file)}")
-    parse_sql_file(sql_file)
+# Read file as lines
+with open(input_xml, 'r') as f:
+    lines = f.readlines()
 
-print(f"\nExtracted updates:")
-for table, items in updates.items():
-    if items:
-        print(f"  {table}: {len(items)}")
+def get_tag_value(line, tag):
+    """Get tag value from a line"""
+    m = re.search(f'<{tag}>([^<]*)</{tag}>', line)
+    if m:
+        return m.group(1)
+    # Handle self-closing with optional whitespace: <tag/> or <tag />
+    if re.search(f'<{tag}\\s*/>', line):
+        return ''
+    return None
 
-# Load PackOut.xml
-print(f"\nReading PackOut.xml...")
-tree = ET.parse(input_xml)
-root = tree.getroot()
+def set_tag_value(line, tag, value):
+    """Set tag value in a line, preserving format"""
+    # Replace <tag>old</tag>
+    new_line = re.sub(f'<{tag}>[^<]*</{tag}>', f'<{tag}>{value}</{tag}>', line)
+    if new_line != line:
+        return new_line
+    # Replace <tag/> or <tag /> (with optional whitespace)
+    new_line = re.sub(f'<{tag}\\s*/>', f'<{tag}>{value}</{tag}>', line)
+    return new_line
 
-def update_element(elem, values):
-    """Update element's child tags with values"""
-    updated = False
-    for field, value in values.items():
-        child = elem.find(field.capitalize())
-        if child is None:
-            child = elem.find(field)
-        if child is None:
-            # Try common field name variations
-            for variant in [field, field.capitalize(), field.lower()]:
-                child = elem.find(variant)
-                if child is not None:
+counts = {}
+
+# Process line by line, tracking element context
+i = 0
+while i < len(lines):
+    line = lines[i]
+
+    # Check for XML element start tags we care about
+    # Must match '<AD_Element ' or '<AD_Element>' but NOT '<AD_Element_ID>'
+    for xml_elem in ['AD_Element', 'AD_Window', 'AD_Tab', 'AD_Field', 'AD_Process', 'AD_Form', 'AD_Menu']:
+        if not (f'<{xml_elem} ' in line or f'<{xml_elem}>' in line) or f'</{xml_elem}>' in line:
+            continue
+
+        table = xml_elem.upper()
+        if table not in updates:
+            continue
+
+        # Find the end of this element (AD_Window can span 5000+ lines)
+        elem_start = i
+        elem_end = i
+        depth = 1
+        for j in range(i + 1, min(i + 50000, len(lines))):
+            # Check for nested element start (must be proper start tag, not _ID etc)
+            if (f'<{xml_elem} ' in lines[j] or f'<{xml_elem}>' in lines[j]) and f'</{xml_elem}>' not in lines[j]:
+                depth += 1
+            if f'</{xml_elem}>' in lines[j]:
+                depth -= 1
+                if depth == 0:
+                    elem_end = j
                     break
-        if child is not None and value is not None:
-            child.text = value
-            updated = True
-    return updated
 
-counts = {k: 0 for k in updates.keys()}
+        # Collect all tag values in this element
+        elem_tags = {}
+        entity_type = None
+        for j in range(elem_start, elem_end + 1):
+            # Check EntityType
+            et = get_tag_value(lines[j], 'EntityType')
+            if et is not None:
+                entity_type = et
+            for tag in ['ColumnName', 'Name', 'AD_Element_ID', 'AD_Window_ID', 'AD_Tab_ID',
+                       'AD_Field_ID', 'AD_Process_ID', 'AD_Form_ID', 'AD_Menu_ID']:
+                val = get_tag_value(lines[j], tag)
+                if val is not None:
+                    elem_tags[tag] = (j, val)
 
-# Apply updates to AD_Element
-print("Applying to AD_Elements...")
-for elem in root.iter('AD_Element'):
-    col_elem = elem.find('ColumnName')
-    if col_elem is not None and col_elem.text in updates['AD_Element']:
-        if update_element(elem, updates['AD_Element'][col_elem.text]):
-            counts['AD_Element'] += 1
+        # Skip core dictionary elements (EntityType='D')
+        if entity_type == 'D':
+            i = elem_end
+            break
 
-# Apply updates to AD_Window
-print("Applying to AD_Windows...")
-for elem in root.iter('AD_Window'):
-    # Try by ID first
-    id_elem = elem.find('AD_Window_ID')
-    if id_elem is not None and ('ID', id_elem.text) in updates['AD_Window']:
-        if update_element(elem, updates['AD_Window'][('ID', id_elem.text)]):
-            counts['AD_Window'] += 1
-            continue
-    # Try by Name
-    name_elem = elem.find('Name')
-    if name_elem is not None and ('Name', name_elem.text) in updates['AD_Window']:
-        if update_element(elem, updates['AD_Window'][('Name', name_elem.text)]):
-            counts['AD_Window'] += 1
+        # Try to match this element with ALL update rules (don't break after first)
+        matched = False
+        for key_type, key_updates in updates[table].items():
+            if key_type in elem_tags:
+                line_idx, key_val = elem_tags[key_type]
+                if key_val in key_updates:
+                    # Apply all field updates for this match
+                    vals_to_apply = key_updates[key_val]
+                    for field, new_val in vals_to_apply.items():
+                        # Find the field line within this element
+                        for j in range(elem_start, elem_end + 1):
+                            old_val = get_tag_value(lines[j], field)
+                            if old_val is not None:
+                                new_line = set_tag_value(lines[j], field, new_val)
+                                if new_line != lines[j]:
+                                    lines[j] = new_line
+                                    counts[xml_elem] = counts.get(xml_elem, 0) + 1
+                                break
+                    matched = True
+                    # Don't break - continue checking other key types
 
-# Apply updates to AD_Tab
-print("Applying to AD_Tabs...")
-for elem in root.iter('AD_Tab'):
-    # Try by ID
-    id_elem = elem.find('AD_Tab_ID')
-    if id_elem is not None and id_elem.text in updates['AD_Tab']:
-        if update_element(elem, updates['AD_Tab'][id_elem.text]):
-            counts['AD_Tab'] += 1
-            continue
-    # Try by Name
-    name_elem = elem.find('Name')
-    if name_elem is not None and ('Name', name_elem.text) in updates['AD_Tab']:
-        if update_element(elem, updates['AD_Tab'][('Name', name_elem.text)]):
-            counts['AD_Tab'] += 1
+        if matched:
+            i = elem_end  # Skip to end of this element
+        break
 
-# Apply updates to AD_Field
-print("Applying to AD_Fields...")
-for elem in root.iter('AD_Field'):
-    id_elem = elem.find('AD_Field_ID')
-    if id_elem is not None and id_elem.text in updates['AD_Field']:
-        if update_element(elem, updates['AD_Field'][id_elem.text]):
-            counts['AD_Field'] += 1
-
-# Apply updates to AD_Process
-print("Applying to AD_Processes...")
-for elem in root.iter('AD_Process'):
-    id_elem = elem.find('AD_Process_ID')
-    if id_elem is not None and id_elem.text in updates['AD_Process']:
-        if update_element(elem, updates['AD_Process'][id_elem.text]):
-            counts['AD_Process'] += 1
-
-# Apply updates to AD_Form
-print("Applying to AD_Forms...")
-for elem in root.iter('AD_Form'):
-    id_elem = elem.find('AD_Form_ID')
-    if id_elem is not None and id_elem.text in updates['AD_Form']:
-        if update_element(elem, updates['AD_Form'][id_elem.text]):
-            counts['AD_Form'] += 1
-
-# Apply updates to AD_Menu
-print("Applying to AD_Menus...")
-for elem in root.iter('AD_Menu'):
-    id_elem = elem.find('AD_Menu_ID')
-    if id_elem is not None and id_elem.text in updates['AD_Menu']:
-        if update_element(elem, updates['AD_Menu'][id_elem.text]):
-            counts['AD_Menu'] += 1
+    i += 1
 
 # Write output
 print(f"\nWriting: {output_xml}")
-tree.write(output_xml, encoding='UTF-8', xml_declaration=True)
+with open(output_xml, 'w') as f:
+    f.writelines(lines)
 
-print(f"\nApplied updates:")
-total = 0
-for table, count in counts.items():
-    if count > 0:
-        print(f"  {table}: {count}")
-        total += count
+print(f"\nApplied field updates:")
+total = sum(counts.values())
+for t, c in sorted(counts.items()):
+    print(f"  {t}: {c}")
 print(f"Total: {total}")
 print("Done!")

@@ -113,6 +113,9 @@ public class NinjaProcessor {
             // Parse Config sheet first
             parseConfigSheet();
 
+            // Detect format: Legacy (RO_ModelMaker) vs New (Model sheet)
+            boolean isLegacyFormat = workbook.getSheet("2_RO_ModelMaker") != null;
+
             // Process sheets in order
             for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
                 HSSFSheet sheet = workbook.getSheetAt(i);
@@ -120,19 +123,28 @@ public class NinjaProcessor {
 
                 if ("Config".equals(sheetName)) {
                     continue; // Already processed
-                } else if ("List".equals(sheetName)) {
+                } else if ("List".equals(sheetName) || "DataTypeMaker".equals(sheetName)) {
                     log("Processing List sheet (Reference values)...");
                     processListSheet(sheet);
                 } else if ("Model".equals(sheetName)) {
                     log("Processing Model sheet (Tables/Windows)...");
                     processModelSheet(sheet);
+                } else if ("2_RO_ModelMaker".equals(sheetName)) {
+                    log("Processing Legacy RO_ModelMaker sheet...");
+                    processLegacyModelMakerSheet(sheet);
                 } else if ("Process".equals(sheetName)) {
                     log("Processing Process sheet (AD_Process)...");
                     processProcessSheet(sheet);
                 } else if ("Menu".equals(sheetName)) {
                     log("Processing Menu sheet (custom menu structure)...");
                     processMenuSheet(sheet);
-                } else if (sheetName.contains("_")) {
+                } else if (sheetName.startsWith("1_") || sheetName.startsWith("3_") ||
+                           sheetName.startsWith("4_") || sheetName.startsWith("5_") ||
+                           "ModelMakerSource".equals(sheetName)) {
+                    logVerbose("Skipping meta sheet: " + sheetName);
+                    continue; // Skip legacy meta sheets
+                } else if (sheetName.contains("_") && !sheetName.startsWith("_")) {
+                    // Table-named sheets for data import (e.g., HR_Employee, C_BPartner)
                     log("Processing Data sheet: " + sheetName);
                     processDataSheet(sheet);
                 }
@@ -249,6 +261,264 @@ public class NinjaProcessor {
             refList.saveEx(trxName);
             logVerbose("    Added list value: " + name);
         }
+    }
+
+    /**
+     * Process Legacy RO_ModelMaker sheet format (from Ninja_HRMIS.xlsx style)
+     * Columns: Header_ID, SeqNo, WorkflowStructure, KanbanBoard, Master, Name, Help, ColumnSet
+     */
+    private void processLegacyModelMakerSheet(HSSFSheet sheet) throws Exception {
+        log("  Processing Legacy ModelMaker format...");
+
+        // Skip header row
+        for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+            HSSFRow row = sheet.getRow(i);
+            if (row == null) continue;
+
+            // Parse columns: 0=Header_ID, 1=SeqNo, 2=WorkflowStructure, 3=KanbanBoard, 4=Master, 5=Name, 6=Help, 7=ColumnSet
+            boolean workflowStructure = "Y".equalsIgnoreCase(getCellString(row.getCell(2)));
+            boolean kanbanBoard = "Y".equalsIgnoreCase(getCellString(row.getCell(3)));
+            String masterTable = getCellString(row.getCell(4));
+            String tableName = getCellString(row.getCell(5));
+            String help = getCellString(row.getCell(6));
+            String columnSet = getCellString(row.getCell(7));
+
+            if (tableName == null || tableName.isBlank()) continue;
+
+            // Clean table name
+            tableName = tableName.trim().replaceAll("\\s+", "");
+            if (!tableName.contains("_") && menuPrefix != null) {
+                tableName = menuPrefix + tableName;
+            }
+
+            log("  Creating table: " + tableName);
+
+            // Create table
+            MTable table = createOrGetTable(tableName, help);
+            tableset.add(table);
+
+            // Parse and create columns from ColumnSet
+            if (columnSet != null && !columnSet.isBlank()) {
+                String[] columns = columnSet.split(",");
+                for (String colDef : columns) {
+                    colDef = colDef.trim();
+                    if (!colDef.isBlank()) {
+                        addColumnFromDef(table, colDef);
+                    }
+                }
+            }
+
+            // Add WorkflowStructure columns if flagged
+            if (workflowStructure) {
+                log("    Adding WorkflowStructure columns...");
+                addWorkflowStructureColumns(table);
+            }
+
+            // Create Window and Tab
+            String windowName = tableName;
+            if (menuPrefix != null && !menuPrefix.isEmpty()) {
+                windowName = tableName.replace(menuPrefix, "");
+            }
+            MWindow window = createOrGetWindow(leadingCapsSpacing(windowName));
+            windowset.add(window);
+            MTab tab = createTab(window, table, 0, null);
+            tabset.add(tab);
+
+            // Handle Master-Detail relationship
+            if (masterTable != null && !masterTable.isBlank()) {
+                log("    Master table: " + masterTable);
+                // Add foreign key to master
+                String masterTableName = masterTable.trim().replaceAll("\\s+", "");
+                if (!masterTableName.contains("_") && menuPrefix != null) {
+                    masterTableName = menuPrefix + masterTableName;
+                }
+                String fkColumnName = masterTableName + "_ID";
+                addColumnFromDef(table, fkColumnName);
+                // Set tab level and parent link
+                MColumn fkCol = table.getColumn(fkColumnName);
+                if (fkCol != null) {
+                    fkCol.setIsParent(true);
+                    fkCol.saveEx(trxName);
+                    tab.setTabLevel(1);
+                    tab.setAD_Column_ID(fkCol.getAD_Column_ID());
+                    tab.saveEx(trxName);
+                }
+            }
+
+            // Create KanbanBoard if flagged and has DocStatus
+            if (kanbanBoard && workflowStructure) {
+                log("    Creating KanbanBoard...");
+                createKanbanBoard(table);
+            }
+
+            // Create menu item
+            MMenu menu = createMenuForWindow(window);
+            menuset.add(menu);
+
+            tablesCreated++;
+        }
+    }
+
+    /**
+     * Add WorkflowStructure columns: DocStatus, DocAction, Processed, DocumentNo, IsApproved
+     */
+    private void addWorkflowStructureColumns(MTable table) {
+        // DocStatus - List reference to _Document Status
+        MColumn docStatus = getOrCreateColumn(table, "DocStatus", DisplayType.List, 2);
+        MReference docStatusRef = new Query(Env.getCtx(), MReference.Table_Name,
+                "Name=?", trxName).setParameters("_Document Status").first();
+        if (docStatusRef != null) {
+            docStatus.setAD_Reference_Value_ID(docStatusRef.getAD_Reference_ID());
+        }
+        docStatus.setDefaultValue("DR");
+        docStatus.saveEx(trxName);
+
+        // DocAction - Button with process
+        MColumn docAction = getOrCreateColumn(table, "DocAction", DisplayType.Button, 2);
+        MReference docActionRef = new Query(Env.getCtx(), MReference.Table_Name,
+                "Name=?", trxName).setParameters("_Document Action").first();
+        if (docActionRef != null) {
+            docAction.setAD_Reference_Value_ID(docActionRef.getAD_Reference_ID());
+        }
+        docAction.setDefaultValue("CO");
+        docAction.saveEx(trxName);
+
+        // Processed - YesNo
+        MColumn processed = getOrCreateColumn(table, "Processed", DisplayType.YesNo, 1);
+        processed.setDefaultValue("N");
+        processed.saveEx(trxName);
+
+        // DocumentNo - String
+        MColumn documentNo = getOrCreateColumn(table, "DocumentNo", DisplayType.String, 30);
+        documentNo.saveEx(trxName);
+
+        // IsApproved - YesNo
+        MColumn isApproved = getOrCreateColumn(table, "IsApproved", DisplayType.YesNo, 1);
+        isApproved.setDefaultValue("N");
+        isApproved.saveEx(trxName);
+
+        columnsCreated += 5;
+    }
+
+    /**
+     * Create KanbanBoard for table with DocStatus
+     */
+    private void createKanbanBoard(MTable table) {
+        try {
+            // Check if KDB_KanbanBoard table exists
+            MTable kanbanTable = MTable.get(Env.getCtx(), "KDB_KanbanBoard");
+            if (kanbanTable == null || kanbanTable.getAD_Table_ID() == 0) {
+                log("    WARNING: KDB_KanbanBoard table not found - KanbanBoard plugin not installed");
+                return;
+            }
+
+            // Get DocStatus column
+            MColumn docStatusCol = table.getColumn("DocStatus");
+            if (docStatusCol == null) {
+                log("    WARNING: DocStatus column not found for KanbanBoard");
+                return;
+            }
+
+            // Create KanbanBoard via SQL for compatibility
+            String checkSql = "SELECT COUNT(*) FROM KDB_KanbanBoard WHERE Name=?";
+            int count = DB.getSQLValue(trxName, checkSql, table.getTableName());
+
+            if (count == 0) {
+                String insertSql = "INSERT INTO KDB_KanbanBoard " +
+                        "(KDB_KanbanBoard_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy, " +
+                        "Name, AD_Table_ID, KDB_ColumnList_ID, KDB_KanbanBoard_UU) " +
+                        "VALUES (nextID(AD_SEQUENCE_ID,'KDB_KanbanBoard'), ?, 0, 'Y', NOW(), 100, NOW(), 100, " +
+                        "?, ?, ?, generate_uuid())";
+
+                int clientId = Env.getAD_Client_ID(Env.getCtx());
+                int no = DB.executeUpdate(insertSql,
+                        new Object[]{clientId, table.getTableName(), table.getAD_Table_ID(), docStatusCol.getAD_Column_ID()},
+                        false, trxName);
+                if (no > 0) {
+                    log("    Created KanbanBoard for " + table.getTableName());
+                }
+            }
+        } catch (Exception e) {
+            log("    WARNING: Could not create KanbanBoard: " + e.getMessage());
+        }
+    }
+
+    private MColumn getOrCreateColumn(MTable table, String columnName, int displayType, int length) {
+        MColumn column = table.getColumn(columnName);
+        if (column == null) {
+            column = new MColumn(Env.getCtx(), 0, trxName);
+            column.setAD_Table_ID(table.getAD_Table_ID());
+            column.setColumnName(columnName);
+            column.setName(leadingCapsSpacing(columnName));
+            column.setAD_Reference_ID(displayType);
+            column.setFieldLength(length);
+            column.setEntityType(entityType);
+
+            // Get or create element
+            M_Element element = M_Element.get(Env.getCtx(), columnName, trxName);
+            if (element == null) {
+                element = new M_Element(Env.getCtx(), columnName, entityType, trxName);
+                element.saveEx(trxName);
+            }
+            column.setAD_Element_ID(element.getAD_Element_ID());
+            column.saveEx(trxName);
+        }
+        return column;
+    }
+
+    private void addColumnFromDef(MTable table, String colDef) {
+        // Parse column definition with type prefix (Q#, A#, D#, etc.)
+        String[] split = colDef.split("#");
+        String type = "";
+        String colName = colDef;
+        if (split.length == 2) {
+            type = split[0].trim();
+            colName = split[1].trim();
+        }
+        colName = colName.replaceAll("\\s+", "");
+
+        if (table.getColumn(colName) != null) return; // Already exists
+
+        int reference = DisplayType.String;
+        int length = 22;
+
+        if (type.equals("Q") || colName.contains("Qty")) {
+            reference = DisplayType.Quantity;
+            length = 11;
+        } else if (type.equals("Y") || colName.startsWith("Is")) {
+            reference = DisplayType.YesNo;
+            length = 1;
+        } else if (type.equals("A") || colName.contains("Amt")) {
+            reference = DisplayType.Amount;
+            length = 11;
+        } else if (type.equals("D") || colName.contains("Date")) {
+            reference = DisplayType.Date;
+            length = 7;
+        } else if (type.equals("d") || colName.contains("Time")) {
+            reference = DisplayType.DateTime;
+            length = 7;
+        } else if (type.equals("T") || colName.contains("Text")) {
+            reference = DisplayType.Text;
+            length = 2000;
+        } else if (type.equals("L")) {
+            reference = DisplayType.List;
+        } else if (colName.endsWith("_ID")) {
+            reference = DisplayType.TableDir;
+        }
+
+        MColumn column = getOrCreateColumn(table, colName, reference, length);
+
+        // Handle List reference
+        if (type.equals("L")) {
+            MReference ref = new Query(Env.getCtx(), MReference.Table_Name,
+                    "Name=?", trxName).setParameters(colName).first();
+            if (ref != null) {
+                column.setAD_Reference_Value_ID(ref.getAD_Reference_ID());
+                column.saveEx(trxName);
+            }
+        }
+
+        columnsCreated++;
     }
 
     private void processModelSheet(HSSFSheet sheet) throws Exception {
@@ -897,7 +1167,8 @@ public class NinjaProcessor {
         String columnName = name.replaceAll("\\s+", "");
 
         // Add prefix for _ID columns
-        if (columnName.endsWith("_ID") && !columnName.contains(menuPrefix) && columnName.split("_").length < 3) {
+        if (menuPrefix != null && !menuPrefix.isEmpty() &&
+            columnName.endsWith("_ID") && !columnName.contains(menuPrefix) && columnName.split("_").length < 3) {
             columnName = menuPrefix + columnName;
         }
 
@@ -1065,13 +1336,15 @@ public class NinjaProcessor {
             if (cell == null) break;
 
             String colName = getCellString(cell);
+            // Search by Name (display name) as Excel headers use human-readable names
+            // This matches original ModuleMaker behavior
             MColumn column = new Query(Env.getCtx(), MColumn.Table_Name,
                     MColumn.COLUMNNAME_Name + "=? AND " + MColumn.COLUMNNAME_AD_Table_ID + "=?", trxName)
                     .setParameters(colName, table.get_ID())
                     .first();
 
             if (column == null) {
-                log("  WARNING: Column " + colName + " not found in table " + tableName);
+                log("  WARNING: Column '" + colName + "' not found in table " + tableName);
             }
             columns.add(column);
         }
@@ -1110,14 +1383,26 @@ public class NinjaProcessor {
             }
 
             if (colList.length() > 0) {
-                // Add standard columns
+                // Add standard columns - get client from context or use first active client
+                int clientId = Env.getAD_Client_ID(Env.getCtx());
+                if (clientId == 0) {
+                    // Get first non-System client
+                    clientId = DB.getSQLValue(trxName,
+                            "SELECT AD_Client_ID FROM AD_Client WHERE AD_Client_ID > 0 AND IsActive='Y' ORDER BY AD_Client_ID LIMIT 1");
+                    if (clientId < 0) clientId = 0;
+                }
+                int nextId = DB.getSQLValue(trxName,
+                        "SELECT COALESCE(MAX(" + table.getTableName() + "_ID), 999999) + 1 FROM " + table.getTableName());
+                if (nextId < 1000000) nextId = 1000000 + row;
+
                 String sql = String.format(
                         "INSERT INTO %s (AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy, %s_ID, %s) " +
-                                "VALUES (0, 0, 'Y', NOW(), 100, NOW(), 100, %d, %s)",
+                                "VALUES (%d, 0, 'Y', NOW(), 100, NOW(), 100, %d, %s)",
                         table.getTableName(),
                         table.getTableName(),
                         colList,
-                        1000000 + row,
+                        clientId,
+                        nextId,
                         valList
                 );
 
@@ -1352,4 +1637,179 @@ public class NinjaProcessor {
     public List<MWindow> getWindows() { return windowset; }
     public List<MProcess> getProcesses() { return processset; }
     public List<MMenu> getMenus() { return menuset; }
+
+    // ========== Missing methods for Model sheet processing ==========
+
+    /**
+     * Get existing table or create new one with help text
+     */
+    private MTable createOrGetTable(String tableName, String help) throws Exception {
+        MTable table = new Query(Env.getCtx(), MTable.Table_Name,
+                MTable.COLUMNNAME_TableName + "=?", trxName)
+                .setParameters(tableName)
+                .first();
+
+        if (table != null) {
+            return table;
+        }
+
+        String displayName = leadingCapsSpacing(tableName);
+
+        // Create element for ID column
+        M_Element idElement = M_Element.get(Env.getCtx(), tableName + "_ID", trxName);
+        if (idElement == null) {
+            idElement = new M_Element(Env.getCtx(), 0, trxName);
+            idElement.setColumnName(tableName + "_ID");
+            idElement.setPrintName(displayName);
+            idElement.setName(displayName);
+            idElement.setEntityType(entityType);
+            idElement.saveEx(trxName);
+        }
+
+        // Create UUID element
+        M_Element uuElement = M_Element.get(Env.getCtx(), tableName + "_UU");
+        if (uuElement == null) {
+            uuElement = new M_Element(Env.getCtx(), tableName + "_UU", entityType, trxName);
+            uuElement.saveEx(trxName);
+        }
+
+        // Create table
+        table = new MTable(Env.getCtx(), 0, trxName);
+        table.setTableName(tableName);
+        table.setName(displayName);
+        table.setDescription(help != null ? help : "");
+        table.setHelp(help != null ? help : "");
+        table.setEntityType(entityType);
+        table.setAccessLevel("3"); // Client+Organization
+        table.set_ValueOfColumn("AD_Client_ID", 0);
+        table.saveEx(trxName);
+
+        // Create ID column
+        MColumn idColumn = new MColumn(Env.getCtx(), 0, trxName);
+        idColumn.setColumnName(tableName + "_ID");
+        idColumn.setName(displayName);
+        idColumn.setAD_Element_ID(idElement.get_ID());
+        idColumn.setAD_Reference_ID(DisplayType.ID);
+        idColumn.setFieldLength(22);
+        idColumn.setIsMandatory(true);
+        idColumn.setIsKey(true);
+        idColumn.setAD_Table_ID(table.get_ID());
+        idColumn.setEntityType(entityType);
+        idColumn.saveEx(trxName);
+
+        // Create standard columns
+        createStandardColumns(table);
+
+        tablesCreated++;
+        logVerbose("  Created table: " + tableName);
+        return table;
+    }
+
+    /**
+     * Get existing window or create new one
+     */
+    private MWindow createOrGetWindow(String windowName) {
+        MWindow window = new Query(Env.getCtx(), MWindow.Table_Name,
+                MWindow.COLUMNNAME_Name + "=?", trxName)
+                .setParameters(windowName)
+                .first();
+
+        if (window == null) {
+            window = new MWindow(Env.getCtx(), 0, trxName);
+            window.setName(windowName);
+            window.setWindowType("M");
+            window.setEntityType(entityType);
+            window.saveEx(trxName);
+            windowsCreated++;
+            logVerbose("  Created window: " + windowName);
+        }
+
+        return window;
+    }
+
+    /**
+     * Create tab for window with specified table and level
+     */
+    private MTab createTab(MWindow window, MTable table, int tabLevel, String parentCol) throws Exception {
+        String displayName = leadingCapsSpacing(table.getTableName());
+
+        MTab tab = new Query(Env.getCtx(), MTab.Table_Name,
+                MTab.COLUMNNAME_AD_Window_ID + "=? AND " + MTab.COLUMNNAME_AD_Table_ID + "=?", trxName)
+                .setParameters(window.get_ID(), table.get_ID())
+                .first();
+
+        if (tab != null) {
+            return tab;
+        }
+
+        tab = new MTab(window);
+        tab.setName(displayName);
+        tab.setAD_Table_ID(table.getAD_Table_ID());
+        tab.setTabLevel(tabLevel);
+
+        int tabCount = new Query(Env.getCtx(), MTab.Table_Name,
+                MTab.COLUMNNAME_AD_Window_ID + "=?", trxName)
+                .setParameters(window.get_ID())
+                .count();
+
+        tab.setSeqNo(tabCount * 10 + 10);
+        tab.setEntityType(entityType);
+        tab.saveEx(trxName);
+
+        // Create fields for the tab
+        createTabFields(tab);
+
+        logVerbose("  Created tab: " + displayName + " (level " + tabLevel + ")");
+        return tab;
+    }
+
+    /**
+     * Create menu for a window
+     */
+    private MMenu createMenuForWindow(MWindow window) {
+        MMenu menu = new Query(Env.getCtx(), MMenu.Table_Name,
+                MMenu.COLUMNNAME_AD_Window_ID + "=?", trxName)
+                .setParameters(window.getAD_Window_ID())
+                .first();
+
+        if (menu == null) {
+            menu = new MMenu(Env.getCtx(), 0, trxName);
+            menu.setName(window.getName());
+            menu.setAD_Window_ID(window.getAD_Window_ID());
+            menu.setAction(X_AD_Menu.ACTION_Window);
+            menu.setEntityType(entityType);
+            menu.set_ValueOfColumn(MMenu.COLUMNNAME_AD_Client_ID, 0);
+            menu.setAD_Org_ID(0);
+            menu.saveEx(trxName);
+            menusCreated++;
+
+            // Attach to menu tree
+            if (mainMenu != null) {
+                attachMenuToTree(menu);
+            }
+        }
+
+        return menu;
+    }
+
+    /**
+     * Add spaces before capital letters (for display names)
+     * Example: "HREmployee" -> "HR Employee"
+     */
+    private String leadingCapsSpacing(String s) {
+        if (s == null || s.isEmpty()) return s;
+        // Remove prefix like "HR_" or "MP_"
+        if (s.contains("_")) {
+            String[] parts = s.split("_");
+            if (parts.length > 1) {
+                StringBuilder result = new StringBuilder();
+                for (int i = 0; i < parts.length; i++) {
+                    if (i > 0) result.append(" ");
+                    result.append(parts[i]);
+                }
+                return result.toString();
+            }
+        }
+        return addSpacesToCamelCase(s);
+    }
 }
