@@ -301,6 +301,126 @@ Ninja provides helpful examples when Excel format is wrong:
   └─────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+# SilentPiper - Offline Model & Data Tool
+
+Standalone tool for deploying iDempiere AD models and data **without requiring iDempiere runtime**.
+
+## Why "Silent"?
+
+**Silent = No iDempiere Runtime Required**
+
+Traditional iDempiere development requires running server, OSGi container, full application context.
+
+SilentPiper bypasses all of that:
+- Direct JDBC to PostgreSQL
+- Pure Java + SQLite for staging
+- PIPO-compatible output
+
+## Silent Workflow
+
+```
+Excel → SQLite → 2Pack → PostgreSQL
+       (silent)  (silent)  (silent)
+```
+
+| Operation | iDempiere Required? | Database Required? |
+|-----------|--------------------|--------------------|
+| `stage` | No | SQLite only |
+| `packout-model` | No | SQLite only |
+| `packout` | No | SQLite only |
+| `import-silent` | No | PostgreSQL (JDBC) |
+| `apply-data` | No | PostgreSQL (JDBC) |
+| `import` | Yes | PostgreSQL + iDempiere |
+| `apply` | Yes | PostgreSQL + iDempiere |
+
+## SilentPiper Quick Start
+
+```bash
+# 1. Stage Excel model to SQLite (offline)
+java -jar SilentPiper.jar ninja.db stage HRMIS.xlsx
+
+# 2. Generate AD model 2Pack (offline)
+java -jar SilentPiper.jar ninja.db packout-model HRMIS ./output
+
+# 3. Import to PostgreSQL (no iDempiere runtime needed!)
+java -jar SilentPiper.jar ninja.db import-silent ./output/HRMIS_Model_1_0_0.zip
+```
+
+## SilentPiper Commands
+
+### Model Staging (Excel → SQLite)
+
+| Command | Description |
+|---------|-------------|
+| `stage <excel.xlsx>` | Parse Excel intent model to SQLite |
+| `show [bundle]` | Display staged models |
+
+### 2Pack Generation (SQLite → ZIP)
+
+| Command | Description |
+|---------|-------------|
+| `packout-model <bundle> [dir]` | Generate AD 2Pack from SQLite (OFFLINE) |
+| `packout <pack> [dir] [client]` | Export staged data to 2Pack |
+| `packout-ad <prefix> [dir]` | Export AD model from PostgreSQL |
+
+**packout-model** generates PIPO-compatible 2Pack containing:
+- AD_Element, AD_Table, AD_Column
+- AD_Window, AD_Tab, AD_Field
+- AD_Menu
+
+### Silent Import (ZIP → PostgreSQL)
+
+| Command | Description |
+|---------|-------------|
+| `import-silent <2pack.zip>` | Import 2Pack directly via JDBC |
+| `apply-data <pack>` | Insert staged data directly |
+
+**import-silent** workflow:
+```
+2Pack.zip → SAX Parser → SQL INSERT/UPDATE → PostgreSQL
+              (no iDempiere classes needed)
+```
+
+Supported: All `AD_*`, `MP_*`, `A_ASSET*` tables
+
+### SQL Data Operations
+
+| Command | Description |
+|---------|-------------|
+| `sql2pack <data.sql>` | Parse SQL INSERT statements to SQLite |
+| `packs [name]` | Show staged data packs |
+| `applied <pack>` | Show applied records |
+| `clean-data <pack>` | Delete applied records |
+
+### AD Model Sync
+
+| Command | Description |
+|---------|-------------|
+| `sync-ad` | Pull AD model from PostgreSQL to SQLite |
+| `info` | Show AD model statistics |
+| `history [limit]` | Show operation history |
+
+## SilentPiper Examples
+
+### Complete Offline Workflow
+```bash
+# Stage, generate, deploy - all without iDempiere running
+java -jar SilentPiper.jar ninja.db stage ./models/HRMIS.xlsx
+java -jar SilentPiper.jar ninja.db packout-model HRMIS ./output
+java -jar SilentPiper.jar ninja.db import-silent ./output/HRMIS_Model_1_0_0.zip
+```
+
+### Data Pack Workflow
+```bash
+java -jar SilentPiper.jar ninja.db sql2pack ./data/sample.sql
+java -jar SilentPiper.jar ninja.db packout GW_Sample ./output 11
+java -jar SilentPiper.jar ninja.db apply-data GW_Sample
+```
+
+---
+
 ## License
 
 GPL v2 - Free for commercial and non-commercial use.

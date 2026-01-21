@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?><idempiere Name="Red1NinJaData" Version="1" idempiereVersion="" DataBaseVersion="" Description="" Author="" AuthorEmail="" CreatedDate="2016-11-05 19:21:08.546" UpdatedDate="2016-11-05 19:21:08.546" PackOutVersion="100" UpdateDictionary="false" Client="0-SYSTEM-System" AD_Client_UU="11237b53-9592-4af1-b3c5-afd216514b5d">
+    <RO_ModelHeader type="table">
+        <AD_Client_ID>0</AD_Client_ID>
+        <AD_Org_ID>0</AD_Org_ID>
+        <IsActive>Y</IsActive>
+        <Name>Hospital</Name>
+        <Description/>
+        <Help/>
+        <Author/>
+        <Copyright/>
+        <Version/>
+        <RO_ModelHeader_UU>1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_UU>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Bed</Name>
+            <Master/>
+            <ColumnSet>Name,L#BedNo=1/2/3/4/5/6/7/8/9,L#Floor=1/2/3/4,L#Wing=North/South/East/West,Y#InService</ColumnSet>
+            <Description>1</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>f31cdf87-9f9e-47c5-880f-2bb2fe63ff16</RO_ModelMaker_UU>
+            <SeqNo>10</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>BedRegistration</Name>
+            <Master/>
+            <ColumnSet>Name,C_BPartner_ID,AD_User_ID,Bed_ID,L#ClassBed=FirstClass/SecondClass/ThirdClass,D#DateIn,D#DateOut</ColumnSet>
+            <Description>2</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>362ef145-24a6-487e-bf07-a3ce6248453a</RO_ModelMaker_UU>
+            <SeqNo>20</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientActivity</Name>
+            <Master/>
+            <ColumnSet>Name,L#TypeOfAttention=Consultation/Pharmacy/PostTreatment/OutPatient/InPatient/Emergency </ColumnSet>
+            <Description>3</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>a28ce785-6341-469d-9841-1d74a68fa2ce</RO_ModelMaker_UU>
+            <SeqNo>30</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Surgery</Name>
+            <Master>C_BPartner</Master>
+            <ColumnSet>C_BPartner_ID,D#Surgery,D#Discharged,Y#Released</ColumnSet>
+            <Description>5</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>4c2e5b6a-a174-4419-ab87-779d66f04eed</RO_ModelMaker_UU>
+            <SeqNo>40</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Treatment</Name>
+            <Master>Surgery</Master>
+            <ColumnSet>Surgery_ID,D#TreatmentDate,Doctor,Remarks,Nurse</ColumnSet>
+            <Description>6</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>18a04460-f7bf-4dcd-9e03-cdcbc04250f8</RO_ModelMaker_UU>
+            <SeqNo>50</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientLog</Name>
+            <Master>C_BPartner</Master>
+            <ColumnSet>Name,PatientActivity_ID,C_BPartner_ID,AD_User_ID,Description,C_Location_ID,M_Product_ID,Q#QtyDosage,BedRegistration_ID,Q#MaxDosage,Q#Percentage</ColumnSet>
+            <Description>4</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout>QtyDosage&gt;Percentage=QtyDosage / MaxDosage * 100</Callout>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>39cf4a2d-eb55-4114-917e-f14d13ccdde6</RO_ModelMaker_UU>
+            <SeqNo>60</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientLog</Name>
+            <Master/>
+            <ColumnSet/>
+            <Description/>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout>Name&gt;Description=C_BPartner.C_BP_Group.Name</Callout>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>9d259f4d-9d29-4cde-8185-88724eed19b3</RO_ModelMaker_UU>
+            <SeqNo>70</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name/>
+            <Master/>
+            <ColumnSet/>
+            <Description>8</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel>NewWorkFlow=Bed Registration,Patient Activity,Treatment</WorkflowModel>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>3344952c-a68b-4e8b-9349-4be3c0ddbe90</RO_ModelMaker_UU>
+            <SeqNo>80</SeqNo>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientLog,C_BPartner,BedRegistration,Bed</Name>
+            <Master/>
+            <ColumnSet>PatientActivity_ID,QtyDosage,Percentage,DateIn,DateOut</ColumnSet>
+            <Description>7</Description>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>b0fd8bf0-457f-4e2a-8851-9c657132e1b6</RO_ModelMaker_UU>
+            <SeqNo>90</SeqNo>
+        </RO_ModelMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Bed</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>128f7cc4-e9d1-4060-8a24-7657338303c9</RO_CodeMaker_UU>
+            <SeqNo>0</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>BedRegistration</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>70b0156c-bd8e-447c-a495-52ae5c74d66f</RO_CodeMaker_UU>
+            <SeqNo>10</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>BedRegistration</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>4ce370fb-53f7-42e8-8758-c74ff2f3d153</RO_CodeMaker_UU>
+            <SeqNo>20</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientActivity</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>7c1ccadf-8bc8-4d48-8c2e-6240cd077bdc</RO_CodeMaker_UU>
+            <SeqNo>30</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>PatientLog</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>83827d95-2b67-4426-bf37-725a67569b72</RO_CodeMaker_UU>
+            <SeqNo>40</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Surgery</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>67c55315-50ec-493e-9c94-55d819035558</RO_CodeMaker_UU>
+            <SeqNo>50</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Treatment</Name>
+            <PluginLocation>/usr/local/org.red1.blank/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>Y</GenerateModel>
+            <GenerateModelFactory>Y</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess/>
+            <ProcessParameters/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">1c9ed321-b218-4a72-a841-3f391f009bc8</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>d67f2f4b-a2cc-469f-93c9-0ba9eef59146</RO_CodeMaker_UU>
+            <SeqNo>60</SeqNo>
+        </RO_CodeMaker>
+    </RO_ModelHeader>
+    <RO_ModelHeader type="table">
+        <AD_Client_ID>0</AD_Client_ID>
+        <AD_Org_ID>0</AD_Org_ID>
+        <IsActive>Y</IsActive>
+        <Name>BigMenu</Name>
+        <Description/>
+        <Help>Big menu of ninja red1</Help>
+        <Author>red1</Author>
+        <Copyright>red1</Copyright>
+        <Version>1</Version>
+        <RO_ModelHeader_UU>a34c2c84-4d4b-49f4-96fc-da3b82592451</RO_ModelHeader_UU>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>AD_Field,AD_Column,AD_Tab,AD_Window,AD_Table</Name>
+            <Master/>
+            <ColumnSet>ColumnSQL,Callout</ColumnSet>
+            <Description/>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">a34c2c84-4d4b-49f4-96fc-da3b82592451</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>1abe8acd-156f-406a-826e-6802c08c3857</RO_ModelMaker_UU>
+            <SeqNo/>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>C_OrderLine,C_Order,C_BPartner,M_Product</Name>
+            <Master/>
+            <ColumnSet>PriceList,Discount</ColumnSet>
+            <Description/>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">a34c2c84-4d4b-49f4-96fc-da3b82592451</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>aa4327eb-1319-4520-b834-cf69674c6b26</RO_ModelMaker_UU>
+            <SeqNo/>
+        </RO_ModelMaker>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name>Test</Name>
+            <Master/>
+            <ColumnSet>Description</ColumnSet>
+            <Description/>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">a34c2c84-4d4b-49f4-96fc-da3b82592451</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>653a7e7b-19da-436d-ad59-0bf1189a23cd</RO_ModelMaker_UU>
+            <SeqNo>20</SeqNo>
+        </RO_ModelMaker>
+    </RO_ModelHeader>
+    <RO_ModelHeader type="table">
+        <AD_Client_ID>0</AD_Client_ID>
+        <AD_Org_ID>0</AD_Org_ID>
+        <IsActive>Y</IsActive>
+        <Name>Red1Ninja</Name>
+        <Description/>
+        <Help/>
+        <Author/>
+        <Copyright/>
+        <Version/>
+        <RO_ModelHeader_UU>aec050b6-058f-4c08-80fd-a89f74b4de3f</RO_ModelHeader_UU>
+        <RO_ModelMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>Y</IsActive>
+            <Name/>
+            <Master/>
+            <ColumnSet/>
+            <Description/>
+            <Help/>
+            <WorkflowStructure>N</WorkflowStructure>
+            <KanbanBoard>N</KanbanBoard>
+            <Callout/>
+            <WorkflowModel/>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">aec050b6-058f-4c08-80fd-a89f74b4de3f</RO_ModelHeader_ID>
+            <RO_ModelMaker_UU>91ee640d-1553-4cfe-9dc7-8bfca970e83d</RO_ModelMaker_UU>
+            <SeqNo>0</SeqNo>
+        </RO_ModelMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>N</IsActive>
+            <Name>RO_ModelMaker</Name>
+            <PluginLocation>/usr/local/org.red1.ninja/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>N</GenerateModel>
+            <GenerateModelFactory>N</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess>DeleteModel</GenerateProcess>
+            <ProcessParameters>IsAllNodes</ProcessParameters>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">aec050b6-058f-4c08-80fd-a89f74b4de3f</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>9fd03c4d-ce8d-4a04-91cd-89e9e8f51cf1</RO_CodeMaker_UU>
+            <SeqNo>0</SeqNo>
+        </RO_CodeMaker>
+        <RO_CodeMaker type="table">
+            <AD_Client_ID>0</AD_Client_ID>
+            <AD_Org_ID>0</AD_Org_ID>
+            <IsActive>N</IsActive>
+            <Name>RO_ModelMaker</Name>
+            <PluginLocation>/usr/local/org.red1.ninja/src/</PluginLocation>
+            <Description/>
+            <GenerateModel>N</GenerateModel>
+            <GenerateModelFactory>N</GenerateModelFactory>
+            <GenerateTranslation>N</GenerateTranslation>
+            <GenerateProcess>ImportModel</GenerateProcess>
+            <ProcessParameters>Name</ProcessParameters>
+            <RO_ModelHeader_ID reference="uuid" reference-key="RO_ModelHeader">aec050b6-058f-4c08-80fd-a89f74b4de3f</RO_ModelHeader_ID>
+            <RO_CodeMaker_UU>b57a79de-227f-4339-a002-e901a26a3e81</RO_CodeMaker_UU>
+            <SeqNo>10</SeqNo>
+        </RO_CodeMaker>
+    </RO_ModelHeader>
+    <AD_Attachment type="table">
+        <AD_Client_ID>0</AD_Client_ID>
+        <AD_Org_ID>0</AD_Org_ID>
+        <IsActive>Y</IsActive>
+        <AD_Table_ID reference="uuid" reference-key="AD_Table">06f97a10-b619-4669-bb13-29a7fdba3721</AD_Table_ID>
+        <Record_ID reference="uuid" reference-key="RO_ModelMaker">f31cdf87-9f9e-47c5-880f-2bb2fe63ff16</Record_ID>
+        <BinaryData>1.dat|byte[]</BinaryData>
+        <Title>zip</Title>
+        <TextMsg/>
+        <AD_Attachment_UU>85399a3f-b450-434e-9fed-44331d5d9944</AD_Attachment_UU>
+    </AD_Attachment>
+    <AD_Attachment type="table">
+        <AD_Client_ID>0</AD_Client_ID>
+        <AD_Org_ID>0</AD_Org_ID>
+        <IsActive>Y</IsActive>
+        <AD_Table_ID reference="uuid" reference-key="AD_Table">06f97a10-b619-4669-bb13-29a7fdba3721</AD_Table_ID>
+        <Record_ID reference="uuid" reference-key="RO_ModelMaker">362ef145-24a6-487e-bf07-a3ce6248453a</Record_ID>
+        <BinaryData>2.dat|byte[]</BinaryData>
+        <Title>zip</Title>
+        <TextMsg/>
+        <AD_Attachment_UU>19b9e23e-9d0d-46e6-92fa-f4ae592ec762</AD_Attachment_UU>
+    </AD_Attachment>
+</idempiere>

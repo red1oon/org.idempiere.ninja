@@ -1,0 +1,192 @@
+================================================================================
+HOSPITAL - SAMPLE MODEL FROM ORIGINAL NINJA 2PACK
+Demonstrates Master-Detail, Callouts, Inline Lists, Extending Existing Tables
+================================================================================
+
+================================================================================
+SHEET: Config
+================================================================================
+| Property       | Value                  |
+|----------------|------------------------|
+| Bundle-Name    | org.idempiere.hospital |
+| Bundle-Version | 1.0.0                  |
+| Package-Prefix | org.idempiere.hospital |
+| Entity-Type    | U                      |
+| AD_Client_ID   | 11                     |
+
+NOTE: AD_Client_ID=11 is GardenWorld - the standard iDempiere demo client
+
+================================================================================
+SHEET: List
+================================================================================
+| BedNo         | Floor | Wing  | ClassBed    | TypeOfAttention |
+|---------------|-------|-------|-------------|-----------------|
+| 1             | 1     | North | FirstClass  | Consultation    |
+| 2             | 2     | South | SecondClass | Pharmacy        |
+| 3             | 3     | East  | ThirdClass  | PostTreatment   |
+| 4             | 4     | West  |             | OutPatient      |
+| 5             |       |       |             | InPatient       |
+| 6             |       |       |             | Emergency       |
+| 7             |       |       |             |                 |
+| 8             |       |       |             |                 |
+| 9             |       |       |             |                 |
+
+================================================================================
+SHEET: Model
+================================================================================
+| Hospital      |                  |                      |                |                |
+|               | Bed              | BedRegistration      | PatientActivity| Surgery        | Treatment      | PatientLog     |
+|               | Name             | Name                 | Name           | C_BPartner     | Surgery        | C_BPartner     |
+|               | L#BedNo          | C_BPartner_ID        | L#TypeOfAttention| C_BPartner_ID | Surgery_ID     | PatientActivity_ID|
+|               | L#Floor          | AD_User_ID           |                | D#Surgery      | D#TreatmentDate| C_BPartner_ID  |
+|               | L#Wing           | HO_Bed_ID            |                | D#Discharged   | Doctor         | AD_User_ID     |
+|               | Y#InService      | L#ClassBed           |                | Y#Released     | Remarks        | T#Description  |
+|               |                  | D#DateIn             |                |                | Nurse          | C_Location_ID  |
+|               |                  | D#DateOut            |                |                |                | M_Product_ID   |
+|               |                  |                      |                |                |                | Q#QtyDosage    |
+|               |                  |                      |                |                |                | HO_BedRegistration_ID|
+|               |                  |                      |                |                |                | Q#MaxDosage    |
+|               |                  |                      |                |                |                | Q#Percentage   |
+
+EXPLANATION:
+- Column A: Main menu "Hospital"
+- Column B: Bed - standalone table with inline list definitions
+- Column C: BedRegistration - references Bed, C_BPartner
+- Column D: PatientActivity - type of attention list
+- Column E: Surgery - EXTENDS C_BPartner (Master=C_BPartner) - sub-detail to existing model!
+- Column F: Treatment - child of Surgery (Master=Surgery) - 3-level hierarchy
+- Column G: PatientLog - child of C_BPartner with calculations
+
+================================================================================
+SHEET: Callout (optional - for formula columns)
+================================================================================
+| Table      | SourceColumn | TargetColumn | Formula                          |
+|------------|--------------|--------------|----------------------------------|
+| PatientLog | QtyDosage    | Percentage   | QtyDosage / MaxDosage * 100      |
+| PatientLog | Name         | Description  | C_BPartner.C_BP_Group.Name       |
+
+CALLOUT SYNTAX (from original Ninja RO_ModelMaker.Callout field):
+- SourceColumn > TargetColumn = Formula
+- Formula types:
+  1. Arithmetic: QtyDosage / MaxDosage * 100
+  2. Traverse: C_BPartner.C_BP_Group.Name (follows FK relationships)
+  3. Combined: ProductQty * UnitPrice (simple calculation)
+
+================================================================================
+SHEET: Process (optional - attach processes to tables)
+================================================================================
+| ProcessName   | Table      | Parameters        | Description              |
+|---------------|------------|-------------------|--------------------------|
+| PatientReport | PatientLog | DateFrom, DateTo  | Generate patient report  |
+| DischargePatient| HO_Surgery | ConfirmDischarge  | Mark patient as discharged|
+
+Process is attached to table via AD_Table_Process (gear icon in window).
+
+================================================================================
+SHEET: WorkflowModel (optional - create workflow)
+================================================================================
+| Name              | Nodes                                    |
+|-------------------|------------------------------------------|
+| PatientWorkflow   | Bed Registration,Patient Activity,Treatment|
+
+Creates AD_Workflow with nodes for each step.
+- Nodes are the table/activity names
+- Workflow guides user through the process
+
+================================================================================
+SHEET: HO_Bed (Sample Data for GardenWorld)
+================================================================================
+| Name       | BedNo | Floor | Wing  | InService |
+|------------|-------|-------|-------|-----------|
+| Room 101-A | 1     | 1     | North | Y         |
+| Room 101-B | 2     | 1     | North | Y         |
+| Room 102-A | 3     | 1     | South | Y         |
+| Room 102-B | 4     | 1     | South | N         |
+| ICU-1      | 5     | 2     | East  | Y         |
+| ICU-2      | 6     | 2     | East  | Y         |
+
+================================================================================
+SHEET: HO_PatientActivity (Sample Data)
+================================================================================
+| Name           | TypeOfAttention |
+|----------------|-----------------|
+| Initial Consult| Consultation    |
+| Follow-up      | OutPatient      |
+| Emergency Visit| Emergency       |
+| Pharmacy Pickup| Pharmacy        |
+
+================================================================================
+EXPECTED TABLES CREATED
+================================================================================
+1. HO_Bed - Hospital beds with location info
+   - Links to: None (standalone reference)
+
+2. HO_BedRegistration - Patient bed assignments
+   - Links to: C_BPartner (patient), AD_User, HO_Bed
+
+3. HO_PatientActivity - Types of medical attention
+   - Links to: None (standalone reference)
+
+4. HO_Surgery - Surgery records
+   - Links to: C_BPartner (patient) - EXTENDS EXISTING TABLE
+   - This creates a sub-tab in Business Partner window!
+
+5. HO_Treatment - Treatment records for surgery
+   - Links to: HO_Surgery (master-detail)
+   - 3-level hierarchy: C_BPartner -> HO_Surgery -> HO_Treatment
+
+6. HO_PatientLog - Patient activity log with calculations
+   - Links to: C_BPartner, HO_PatientActivity, HO_BedRegistration
+   - Has Callout for auto-calculating Percentage
+
+================================================================================
+SPECIAL FEATURES DEMONSTRATED
+================================================================================
+
+1. EXTENDING EXISTING MODEL (Master=C_BPartner):
+   Surgery table has C_BPartner as Master, meaning it will be added as a
+   sub-tab under the Business Partner window. This is powerful for extending
+   standard iDempiere entities without modifying core code.
+
+2. MULTI-LEVEL MASTER-DETAIL:
+   C_BPartner -> Surgery -> Treatment
+   This creates a 3-level tab structure in the window.
+
+3. INLINE LIST DEFINITIONS:
+   Original Ninja supported: L#BedNo=1/2/3/4/5/6/7/8/9
+   This creates the reference AND populates values in one definition.
+
+4. CALLOUT FORMULAS:
+   QtyDosage > Percentage = QtyDosage / MaxDosage * 100
+   Auto-calculates fields based on other field changes.
+
+5. REFERENCING EXISTING TABLES:
+   C_BPartner_ID, AD_User_ID, M_Product_ID - uses existing iDempiere tables.
+
+================================================================================
+TEST VERIFICATION CHECKLIST
+================================================================================
+
+For GardenWorld (AD_Client_ID=11):
+
+[ ] Tables created: HO_Bed, HO_BedRegistration, HO_PatientActivity,
+                    HO_Surgery, HO_Treatment, HO_PatientLog
+
+[ ] References created: BedNo (9 values), Floor (4 values),
+                        Wing (4 values), ClassBed (3 values),
+                        TypeOfAttention (6 values)
+
+[ ] HO_Surgery has C_BPartner_ID as parent column (IsParent=Y)
+
+[ ] HO_Treatment has HO_Surgery_ID as parent column (IsParent=Y)
+
+[ ] Window "Surgery" added as sub-tab in Business Partner window (optional)
+    OR standalone window with C_BPartner selector
+
+[ ] Sample data imported into HO_Bed (6 records)
+
+[ ] Sample data imported into HO_PatientActivity (4 records)
+
+[ ] Callout registered for HO_PatientLog.QtyDosage -> Percentage
+
+================================================================================

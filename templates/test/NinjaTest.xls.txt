@@ -1,0 +1,174 @@
+================================================================================
+NINJATEST - MINIMAL EXCEL TEMPLATE FOR TESTING
+Simple 2-table model to verify NinjaProcessor SQL generation
+================================================================================
+
+================================================================================
+SHEET: Config
+================================================================================
+| Property       | Value                  |
+|----------------|------------------------|
+| Bundle-Name    | org.idempiere.ninjatest|
+| Bundle-Version | 1.0.0                  |
+| Package-Prefix | org.idempiere.ninjatest|
+| Entity-Type    | U                      |
+
+================================================================================
+SHEET: List
+================================================================================
+| TaskStatus | TaskPriority |
+|------------|--------------|
+| Open       | High         |
+| InProgress | Medium       |
+| Completed  | Low          |
+| Cancelled  |              |
+
+================================================================================
+SHEET: Model
+================================================================================
+| NinjaTest    |                |
+|              | TaskList       | TaskList     |
+|              | Name           | TaskItem     |
+|              | T#Description  | Name         |
+|              |                | L#TaskStatus |
+|              |                | L#TaskPriority|
+|              |                | D#DueDate    |
+|              |                | Y#IsUrgent   |
+
+EXPLANATION:
+- Column A: Main menu name "NinjaTest"
+- Column B: Master table "TaskList" with Name, Description columns
+- Column C: Detail table "TaskItem" linked to TaskList with Name, TaskStatus, TaskPriority, DueDate, IsUrgent
+
+EXPECTED SQL OUTPUT:
+--------------------
+
+-- Create Reference: TaskStatus
+INSERT INTO AD_Reference (AD_Reference_ID, AD_Client_ID, AD_Org_ID, IsActive, ..., Name, ValidationType, EntityType)
+VALUES (nextval, 0, 0, 'Y', ..., 'TaskStatus', 'L', 'U');
+
+-- Create Reference List values for TaskStatus
+INSERT INTO AD_Ref_List (..., AD_Reference_ID, Name, Value) VALUES (..., ref_id, 'Open', 'Op');
+INSERT INTO AD_Ref_List (..., AD_Reference_ID, Name, Value) VALUES (..., ref_id, 'InProgress', 'In');
+INSERT INTO AD_Ref_List (..., AD_Reference_ID, Name, Value) VALUES (..., ref_id, 'Completed', 'Co');
+INSERT INTO AD_Ref_List (..., AD_Reference_ID, Name, Value) VALUES (..., ref_id, 'Cancelled', 'Ca');
+
+-- Create Reference: TaskPriority
+INSERT INTO AD_Reference (..., Name, ValidationType, EntityType) VALUES (..., 'TaskPriority', 'L', 'U');
+
+-- Create Element: NT_TaskList_ID
+INSERT INTO AD_Element (..., ColumnName, Name, PrintName, EntityType) VALUES (..., 'NT_TaskList_ID', 'Task List', 'Task List', 'U');
+
+-- Create Table: NT_TaskList
+INSERT INTO AD_Table (..., TableName, Name, AccessLevel, EntityType) VALUES (..., 'NT_TaskList', 'Task List', '3', 'U');
+
+-- Create Columns for NT_TaskList
+INSERT INTO AD_Column (..., AD_Table_ID, ColumnName, Name, AD_Reference_ID, FieldLength, IsKey, IsMandatory)
+VALUES (..., table_id, 'NT_TaskList_ID', 'Task List', 13, 22, 'Y', 'Y');  -- ID column
+
+INSERT INTO AD_Column (..., AD_Table_ID, ColumnName, Name, AD_Reference_ID, FieldLength)
+VALUES (..., table_id, 'Name', 'Name', 10, 22);  -- String
+
+INSERT INTO AD_Column (..., AD_Table_ID, ColumnName, Name, AD_Reference_ID, FieldLength)
+VALUES (..., table_id, 'Description', 'Description', 14, 2000);  -- Text
+
+-- Standard columns copied from AD_Table (AD_Client_ID, AD_Org_ID, Created, CreatedBy, Updated, UpdatedBy, IsActive)
+
+-- Create Table: NT_TaskItem
+INSERT INTO AD_Table (..., TableName, Name, AccessLevel, EntityType) VALUES (..., 'NT_TaskItem', 'Task Item', '3', 'U');
+
+-- Create Columns for NT_TaskItem
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID) VALUES (..., 'NT_TaskItem_ID', 'Task Item', 13);  -- ID
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID) VALUES (..., 'Name', 'Name', 10);  -- String
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID, AD_Reference_Value_ID) VALUES (..., 'TaskStatus', 'Task Status', 17, ref_taskstatus_id);  -- List
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID, AD_Reference_Value_ID) VALUES (..., 'TaskPriority', 'Task Priority', 17, ref_taskpriority_id);  -- List
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID) VALUES (..., 'DueDate', 'Due Date', 15);  -- Date
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID) VALUES (..., 'IsUrgent', 'Is Urgent', 20);  -- YesNo
+INSERT INTO AD_Column (..., ColumnName, Name, AD_Reference_ID) VALUES (..., 'NT_TaskList_ID', 'Task List', 19);  -- TableDir (FK)
+
+-- Create Window: Task List
+INSERT INTO AD_Window (..., Name, WindowType, EntityType) VALUES (..., 'Task List', 'M', 'U');
+
+-- Create Tabs
+INSERT INTO AD_Tab (..., AD_Window_ID, AD_Table_ID, Name, SeqNo, TabLevel) VALUES (..., window_id, tasklist_table_id, 'Task List', 10, 0);
+INSERT INTO AD_Tab (..., AD_Window_ID, AD_Table_ID, Name, SeqNo, TabLevel) VALUES (..., window_id, taskitem_table_id, 'Task Item', 20, 1);
+
+-- Create Fields for each Tab
+INSERT INTO AD_Field (..., AD_Tab_ID, AD_Column_ID, Name, SeqNo, IsDisplayed) VALUES (...);
+
+-- Create Menu
+INSERT INTO AD_Menu (..., Name, AD_Window_ID, Action, EntityType) VALUES (..., 'Task List', window_id, 'W', 'U');
+
+-- Attach menu to tree
+UPDATE AD_TreeNodeMM SET Parent_ID = main_menu_id WHERE Node_ID = menu_id AND AD_Tree_ID = 10;
+
+-- DDL: Create physical tables
+CREATE TABLE NT_TaskList (
+    NT_TaskList_ID NUMERIC(10) NOT NULL,
+    AD_Client_ID NUMERIC(10) NOT NULL,
+    AD_Org_ID NUMERIC(10) NOT NULL,
+    IsActive CHAR(1) DEFAULT 'Y',
+    Created TIMESTAMP DEFAULT NOW(),
+    CreatedBy NUMERIC(10),
+    Updated TIMESTAMP DEFAULT NOW(),
+    UpdatedBy NUMERIC(10),
+    Name VARCHAR(22),
+    Description VARCHAR(2000),
+    PRIMARY KEY (NT_TaskList_ID)
+);
+
+CREATE TABLE NT_TaskItem (
+    NT_TaskItem_ID NUMERIC(10) NOT NULL,
+    AD_Client_ID NUMERIC(10) NOT NULL,
+    AD_Org_ID NUMERIC(10) NOT NULL,
+    IsActive CHAR(1) DEFAULT 'Y',
+    Created TIMESTAMP DEFAULT NOW(),
+    CreatedBy NUMERIC(10),
+    Updated TIMESTAMP DEFAULT NOW(),
+    UpdatedBy NUMERIC(10),
+    Name VARCHAR(22),
+    TaskStatus VARCHAR(2),
+    TaskPriority VARCHAR(2),
+    DueDate DATE,
+    IsUrgent CHAR(1) DEFAULT 'N',
+    NT_TaskList_ID NUMERIC(10),
+    PRIMARY KEY (NT_TaskItem_ID),
+    FOREIGN KEY (NT_TaskList_ID) REFERENCES NT_TaskList(NT_TaskList_ID)
+);
+
+================================================================================
+TEST VERIFICATION CHECKLIST
+================================================================================
+
+[ ] Config parsed: bundleName = org.idempiere.ninjatest
+[ ] Config parsed: entityType = U
+[ ] Config parsed: menuPrefix = NT_
+
+[ ] Reference created: TaskStatus with 4 values
+[ ] Reference created: TaskPriority with 3 values
+
+[ ] Element created: NT_TaskList_ID
+[ ] Element created: NT_TaskItem_ID
+
+[ ] Table created: NT_TaskList
+[ ] Table created: NT_TaskItem
+
+[ ] Columns created for NT_TaskList: NT_TaskList_ID, Name, Description + standard cols
+[ ] Columns created for NT_TaskItem: NT_TaskItem_ID, Name, TaskStatus, TaskPriority, DueDate, IsUrgent, NT_TaskList_ID + standard cols
+
+[ ] TaskStatus column has AD_Reference_Value_ID pointing to TaskStatus reference
+[ ] TaskPriority column has AD_Reference_Value_ID pointing to TaskPriority reference
+
+[ ] Window created: Task List
+[ ] Tab created: Task List (level 0)
+[ ] Tab created: Task Item (level 1)
+
+[ ] Fields created for each tab
+
+[ ] Menu created: Task List with window link
+[ ] Menu attached to tree under NinjaTest
+
+[ ] Physical table NT_TaskList created
+[ ] Physical table NT_TaskItem created
+
+================================================================================
