@@ -483,6 +483,10 @@ SilentPiper ninja.db xml-sync PackOut.xml PackOut_synced.xml
 
 ---
 
+## Documentation
+
+- **[PIPO Insight](doc/PIPO_INSIGHT.md)** - Deep-dive into iDempiere's 2Pack architecture
+
 ## License
 
 GPL v2 - Free for commercial and non-commercial use.
